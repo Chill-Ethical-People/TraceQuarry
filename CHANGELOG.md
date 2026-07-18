@@ -38,7 +38,7 @@ All notable TraceQuarry changes are documented here. The project follows
 - Multi-collection case workspaces and cross-host correlation.
 - Assisted investigation profiles and interactive timeline review.
 
-[Unreleased]: https://github.com/kensho-cep/tracequarry/compare/v0.4.0-beta.1...HEAD
-[0.4.0-beta.1]: https://github.com/kensho-cep/tracequarry/releases/tag/v0.4.0-beta.1
-[0.3.1]: https://github.com/kensho-cep/tracequarry/releases/tag/v0.3.1
-[0.3.0]: https://github.com/kensho-cep/tracequarry/releases/tag/v0.3.0
+[Unreleased]: https://github.com/Chill-Ethical-People/tracequarry/compare/v0.4.0-beta.1...HEAD
+[0.4.0-beta.1]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.4.0-beta.1
+[0.3.1]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.3.1
+[0.3.0]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.3.0

@@ -21,10 +21,10 @@ classifiers = [
 dependencies = ["PyYAML>=6.0.2,<7"]
 
 [project.urls]
-Homepage = "https://github.com/kensho-cep/tracequarry"
-Documentation = "https://github.com/kensho-cep/tracequarry#readme"
-Issues = "https://github.com/kensho-cep/tracequarry/issues"
-Security = "https://github.com/kensho-cep/tracequarry/security/policy"
+Homepage = "https://github.com/Chill-Ethical-People/tracequarry"
+Documentation = "https://github.com/Chill-Ethical-People/tracequarry#readme"
+Issues = "https://github.com/Chill-Ethical-People/tracequarry/issues"
+Security = "https://github.com/Chill-Ethical-People/tracequarry/security/policy"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]

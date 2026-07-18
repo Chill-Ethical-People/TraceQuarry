@@ -1,8 +1,8 @@
 # TraceQuarry
 
 <p align="center">
-  <a href="https://github.com/kensho-cep/tracequarry/actions/workflows/ci.yml"><img src="https://github.com/kensho-cep/tracequarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-  <a href="https://github.com/kensho-cep/tracequarry/actions/workflows/codeql.yml"><img src="https://github.com/kensho-cep/tracequarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
+  <a href="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/ci.yml"><img src="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/codeql.yml"><img src="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-5C7F67.svg" alt="Apache-2.0 license"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
@@ -427,7 +427,7 @@ TraceQuarry supports Python 3.11 and 3.12. PyYAML is used to validate and load
 the external detection registry.
 
 ```bash
-git clone https://github.com/kensho-cep/tracequarry.git
+git clone https://github.com/Chill-Ethical-People/tracequarry.git
 cd tracequarry
 python3 -m venv .venv
 source .venv/bin/activate
@@ -517,7 +517,7 @@ python3 -m pip install tracequarry-*.whl
 ```
 
 Security-sensitive issues should be reported privately through
-[GitHub Security Advisories](https://github.com/kensho-cep/tracequarry/security/advisories/new)
+[GitHub Security Advisories](https://github.com/Chill-Ethical-People/tracequarry/security/advisories/new)
 or by email to [`contact@chillethicalpeople.com`](mailto:contact@chillethicalpeople.com).
 
 Maintainers should complete the [public release checklist](docs/public-release-checklist.md)

@@ -8,7 +8,7 @@ issues, pull requests, screenshots, or sample archives.
 
 For security-sensitive reports, email
 [`contact@chillethicalpeople.com`](mailto:contact@chillethicalpeople.com) or use
-[GitHub private vulnerability reporting](https://github.com/kensho-cep/tracequarry/security/advisories/new)
+[GitHub private vulnerability reporting](https://github.com/Chill-Ethical-People/tracequarry/security/advisories/new)
 before publishing technical details. Include:
 
 - A concise description of the issue.

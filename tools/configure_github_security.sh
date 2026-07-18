@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="${1:-kensho-cep/tracequarry}"
+repo="${1:-Chill-Ethical-People/tracequarry}"
 visibility="$(gh repo view "$repo" --json visibility --jq '.visibility')"
 
 if [[ "$visibility" != "PUBLIC" ]]; then

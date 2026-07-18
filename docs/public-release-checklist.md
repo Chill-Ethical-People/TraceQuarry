@@ -18,7 +18,7 @@ Use this checklist before changing TraceQuarry from private to public.
 Run the included GitHub hardening helper:
 
 ```bash
-tools/configure_github_security.sh kensho-cep/tracequarry
+tools/configure_github_security.sh Chill-Ethical-People/tracequarry
 ```
 
 This enables private vulnerability reporting, Dependabot vulnerability alerts,
