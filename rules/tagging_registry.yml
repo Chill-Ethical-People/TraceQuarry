@@ -1,0 +1,1613 @@
+# TraceQuarry tagging registry
+#
+# Purpose:
+#   Externalized tag definitions for Linux UAC timeline enrichment, Timesketch
+#   export, and analyst review.
+#
+# Core principle:
+#   Tooling and TTP tags may be applied strongly when the evidence matches.
+#   Actor entries are similarity profiles only. They must never be rendered as
+#   attribution without independent CTI, infrastructure, malware, victimology,
+#   and investigation corroboration.
+#
+# Status:
+#   Runtime registry. TraceQuarry validates and loads tool_tags for event
+#   enrichment; behavioral correlations remain implemented in Python.
+
+metadata:
+  schema_version: "1.0"
+  registry_name: tracequarry_linux_tagging_registry
+  created: "2026-07-01"
+  owner: "Chill Ethical People"
+  license: "Apache-2.0"
+  default_platforms: ["linux", "unix", "cloud", "container"]
+  attribution_policy:
+    tooling_and_ttp: "strong_tag_when_source_evidence_matches"
+    actor_similarity: "profile_similarity_only"
+    forbidden_claims:
+      - "Do not state that a named actor conducted the intrusion from this registry alone."
+      - "Do not infer lateral movement unless outbound access from one parsed host to another parsed host is observed."
+      - "Do not treat strings found inside defensive grep/rg/search commands as execution."
+    required_actor_similarity_wording: "Activity overlaps with this profile. This is not attribution."
+  source_priority:
+    - "MITRE ATT&CK group/software/technique pages"
+    - "Government advisories"
+    - "Primary vendor threat reports"
+    - "DFIR case reports and tool documentation"
+
+source_references:
+  mitre_teamtnt:
+    title: "MITRE ATT&CK G0139 TeamTNT"
+    url: "https://attack.mitre.org/groups/G0139/"
+  mitre_akira:
+    title: "MITRE ATT&CK G1024 Akira"
+    url: "https://attack.mitre.org/groups/G1024/"
+  mitre_apt28:
+    title: "MITRE ATT&CK G0007 APT28"
+    url: "https://attack.mitre.org/groups/G0007/"
+  mitre_sandworm:
+    title: "MITRE ATT&CK G0034 Sandworm Team"
+    url: "https://attack.mitre.org/groups/G0034/"
+  mitre_apt29:
+    title: "MITRE ATT&CK G0016 APT29"
+    url: "https://attack.mitre.org/groups/G0016/"
+  mitre_apt41:
+    title: "MITRE ATT&CK G0096 APT41"
+    url: "https://attack.mitre.org/groups/G0096/"
+  mitre_lazarus:
+    title: "MITRE ATT&CK G0032 Lazarus Group"
+    url: "https://attack.mitre.org/groups/G0032/"
+  mitre_fin7:
+    title: "MITRE ATT&CK G0046 FIN7"
+    url: "https://attack.mitre.org/groups/G0046/"
+  mitre_rclone:
+    title: "MITRE ATT&CK S1040 Rclone"
+    url: "https://attack.mitre.org/software/S1040/"
+  mitre_remote_access_tools:
+    title: "MITRE ATT&CK T1219 Remote Access Tools"
+    url: "https://attack.mitre.org/techniques/T1219/"
+  mitre_exfil_cloud_storage:
+    title: "MITRE ATT&CK T1567.002 Exfiltration to Cloud Storage"
+    url: "https://attack.mitre.org/techniques/T1567/002/"
+  mitre_proxy:
+    title: "MITRE ATT&CK T1090 Proxy"
+    url: "https://attack.mitre.org/techniques/T1090/"
+  mitre_resource_hijacking:
+    title: "MITRE ATT&CK T1496 Resource Hijacking"
+    url: "https://attack.mitre.org/techniques/T1496/"
+  rclone_project:
+    title: "Rclone project documentation"
+    url: "https://rclone.org/"
+  anydesk_project:
+    title: "AnyDesk product documentation"
+    url: "https://anydesk.com/"
+  ngrok_project:
+    title: "ngrok documentation"
+    url: "https://ngrok.com/docs/"
+  lolrmm_project:
+    title: "LOLRMM remote monitoring and management tool catalog"
+    url: "https://lolrmm.io/"
+  cisa_akira:
+    title: "CISA StopRansomware: Akira Ransomware"
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-109a"
+  mitre_boot_or_logon_init_scripts:
+    title: "MITRE ATT&CK T1037.004 Boot or Logon Initialization Scripts: RC Scripts"
+    url: "https://attack.mitre.org/techniques/T1037/004/"
+  mitre_systemd_service:
+    title: "MITRE ATT&CK T1543.002 Create or Modify System Process: Systemd Service"
+    url: "https://attack.mitre.org/techniques/T1543/002/"
+  mitre_cron:
+    title: "MITRE ATT&CK T1053.003 Scheduled Task/Job: Cron"
+    url: "https://attack.mitre.org/techniques/T1053/003/"
+  mitre_ssh_authorized_keys:
+    title: "MITRE ATT&CK T1098.004 Account Manipulation: SSH Authorized Keys"
+    url: "https://attack.mitre.org/techniques/T1098/004/"
+  mitre_pam:
+    title: "MITRE ATT&CK T1556.003 Modify Authentication Process: Pluggable Authentication Modules"
+    url: "https://attack.mitre.org/techniques/T1556/003/"
+  mitre_ld_preload:
+    title: "MITRE ATT&CK T1574.006 Hijack Execution Flow: Dynamic Linker Hijacking"
+    url: "https://attack.mitre.org/techniques/T1574/006/"
+  mitre_web_shell:
+    title: "MITRE ATT&CK T1505.003 Server Software Component: Web Shell"
+    url: "https://attack.mitre.org/techniques/T1505/003/"
+  mitre_kernel_modules:
+    title: "MITRE ATT&CK T1547.006 Boot or Logon Autostart Execution: Kernel Modules and Extensions"
+    url: "https://attack.mitre.org/techniques/T1547/006/"
+  mitre_external_remote_services:
+    title: "MITRE ATT&CK T1133 External Remote Services"
+    url: "https://attack.mitre.org/techniques/T1133/"
+  cisa_lockbit:
+    title: "CISA StopRansomware: LockBit 3.0"
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-165a"
+  cisa_blacksuit:
+    title: "CISA StopRansomware: BlackSuit"
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa24-241a"
+  mitre_blackcat:
+    title: "MITRE ATT&CK S1068 BlackCat"
+    url: "https://attack.mitre.org/software/S1068/"
+  mitre_wastedlocker:
+    title: "MITRE ATT&CK S0612 WastedLocker"
+    url: "https://attack.mitre.org/software/S0612/"
+  mitre_mirai:
+    title: "MITRE ATT&CK S0089 Mirai"
+    url: "https://attack.mitre.org/software/S0089/"
+  mitre_xorddos:
+    title: "MITRE ATT&CK S1012 XorDDoS"
+    url: "https://attack.mitre.org/software/S1012/"
+  mitre_bpfddoor:
+    title: "MITRE ATT&CK S1161 BPFDoor"
+    url: "https://attack.mitre.org/software/S1161/"
+  mitre_tsunami:
+    title: "MITRE ATT&CK S1014 Tsunami"
+    url: "https://attack.mitre.org/software/S1014/"
+  mitre_chaos:
+    title: "MITRE ATT&CK S0220 Chaos"
+    url: "https://attack.mitre.org/software/S0220/"
+  mitre_industroyer2:
+    title: "MITRE ATT&CK S1072 Industroyer2"
+    url: "https://attack.mitre.org/software/S1072/"
+  mitre_zerocleare:
+    title: "MITRE ATT&CK S0230 ZeroCleare"
+    url: "https://attack.mitre.org/software/S0230/"
+  mitre_ransomware:
+    title: "MITRE ATT&CK T1486 Data Encrypted for Impact"
+    url: "https://attack.mitre.org/techniques/T1486/"
+  mitre_data_destruction:
+    title: "MITRE ATT&CK T1485 Data Destruction"
+    url: "https://attack.mitre.org/techniques/T1485/"
+  mitre_inhibit_recovery:
+    title: "MITRE ATT&CK T1490 Inhibit System Recovery"
+    url: "https://attack.mitre.org/techniques/T1490/"
+  mitre_malicious_kernel_module:
+    title: "MITRE ATT&CK T1014 Rootkit"
+    url: "https://attack.mitre.org/techniques/T1014/"
+
+tag_namespaces:
+  tool: "Concrete tool, binary, package, service, or command literal."
+  ttp: "Observed behavior pattern or analytic rule."
+  attack: "MITRE ATT&CK technique or sub-technique."
+  actor_similarity: "Non-attribution profile overlap."
+  timesketch: "Recommended label/search metadata for Timesketch export."
+
+tool_tags:
+  rclone:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: high
+    match_literals: ["rclone"]
+    suspicious_arguments:
+      - "copy"
+      - "sync"
+      - "move"
+      - "serve"
+      - "config"
+      - "--config"
+      - "--transfers"
+      - "--bwlimit"
+      - "--ignore-existing"
+      - "remote:"
+    related_ttps: ["ttp.exfil_tool_usage", "ttp.cloud_storage_exfiltration", "ttp.file_discovery_for_exfiltration"]
+    mitre: ["T1567.002", "T1048.002", "T1048.003", "T1030", "T1560.001", "T1083"]
+    timesketch_labels: ["tool.rclone", "attack.T1567.002", "tracequarry.exfil"]
+    source_refs: ["mitre_rclone", "rclone_project"]
+    analyst_note: "Legitimate backup/sync tool. High signal when observed with unusual config paths, cloud remotes, staging directories, or after archive creation."
+
+  megacmd:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: high
+    match_literals: ["megacmd", "mega-cmd", "mega-put", "mega-get", "megasync"]
+    related_ttps: ["ttp.exfil_tool_usage", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1567.002", "T1048"]
+    timesketch_labels: ["tool.megacmd", "tracequarry.exfil"]
+
+  aws_cli:
+    namespace: tool
+    category: cloud_cli
+    confidence_when_matched: medium
+    match_literals: ["aws"]
+    suspicious_arguments: ["s3 cp", "s3 sync", "sts get-caller-identity", "iam", "configure", "ec2 describe", "secretsmanager"]
+    related_ttps: ["ttp.cloud_cli_usage", "ttp.cloud_credential_access", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1059.009", "T1552.005", "T1567.002"]
+    timesketch_labels: ["tool.aws_cli", "attack.T1059.009", "tracequarry.cloud"]
+
+  gcloud_cli:
+    namespace: tool
+    category: cloud_cli
+    confidence_when_matched: medium
+    match_literals: ["gcloud", "gsutil"]
+    suspicious_arguments: ["auth", "config", "storage cp", "storage rsync", "iam", "compute instances list"]
+    related_ttps: ["ttp.cloud_cli_usage", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1059.009", "T1567.002"]
+    timesketch_labels: ["tool.gcloud", "tool.gsutil", "tracequarry.cloud"]
+
+  azure_cli:
+    namespace: tool
+    category: cloud_cli
+    confidence_when_matched: medium
+    match_literals: ["az", "azcopy"]
+    suspicious_arguments: ["login", "account", "storage copy", "storage blob", "role assignment"]
+    related_ttps: ["ttp.cloud_cli_usage", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1059.009", "T1567.002"]
+    timesketch_labels: ["tool.azure_cli", "tool.azcopy", "tracequarry.cloud"]
+
+  anydesk:
+    namespace: tool
+    category: remote_access
+    confidence_when_matched: high
+    match_literals: ["anydesk", "anydesk.service", "ad_svc"]
+    suspicious_paths: ["/etc/anydesk", "/var/log/anydesk", "/usr/bin/anydesk", "/usr/share/anydesk"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.interactive_c2_candidate"]
+    mitre: ["T1219", "T1219.002"]
+    timesketch_labels: ["tool.anydesk", "attack.T1219", "tracequarry.remote_access"]
+    source_refs: ["mitre_remote_access_tools", "anydesk_project"]
+    analyst_note: "Legitimate remote support tool. High signal if newly installed, uncommon on server baseline, or paired with suspicious logins."
+
+  atera:
+    namespace: tool
+    category: rmm
+    confidence_when_matched: high
+    match_literals: ["atera", "agentinstaller", "ateraagent"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.rmm_tool_usage"]
+    mitre: ["T1219"]
+    timesketch_labels: ["tool.atera", "attack.T1219"]
+    source_refs: ["mitre_remote_access_tools", "mitre_fin7"]
+
+  connectwise_screenconnect:
+    namespace: tool
+    category: rmm
+    confidence_when_matched: high
+    match_literals: ["screenconnect", "connectwise", "connectwisecontrol"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.rmm_tool_usage"]
+    mitre: ["T1219"]
+    timesketch_labels: ["tool.screenconnect", "tool.connectwise", "attack.T1219"]
+    source_refs: ["mitre_remote_access_tools"]
+
+  splashtop:
+    namespace: tool
+    category: rmm
+    confidence_when_matched: high
+    match_literals: ["splashtop", "srmanager", "streamer"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.rmm_tool_usage"]
+    mitre: ["T1219"]
+    timesketch_labels: ["tool.splashtop", "attack.T1219"]
+    source_refs: ["mitre_remote_access_tools"]
+
+  logmein:
+    namespace: tool
+    category: remote_access
+    confidence_when_matched: high
+    match_literals: ["logmein", "logmeinrescue", "gotoassist", "gotomypc"]
+    related_ttps: ["ttp.remote_access_tool_usage"]
+    mitre: ["T1219"]
+    timesketch_labels: ["tool.logmein", "attack.T1219"]
+
+  teamviewer:
+    namespace: tool
+    category: remote_access
+    confidence_when_matched: high
+    match_literals: ["teamviewer", "teamviewerd"]
+    related_ttps: ["ttp.remote_access_tool_usage"]
+    mitre: ["T1219"]
+    timesketch_labels: ["tool.teamviewer", "attack.T1219"]
+    source_refs: ["mitre_remote_access_tools"]
+
+  chisel:
+    namespace: tool
+    category: tunneling
+    confidence_when_matched: high
+    match_literals: ["chisel"]
+    suspicious_arguments: ["client", "server", "reverse", "R:"]
+    related_ttps: ["ttp.tunnel_or_proxy_tool", "ttp.reverse_tunnel"]
+    mitre: ["T1090", "T1572"]
+    timesketch_labels: ["tool.chisel", "attack.T1090", "tracequarry.tunnel"]
+
+  frp:
+    namespace: tool
+    category: tunneling
+    confidence_when_matched: high
+    match_literals: ["frpc", "frps", "frp"]
+    suspicious_paths: ["frpc.ini", "frps.ini", "frpc.toml", "frps.toml"]
+    related_ttps: ["ttp.tunnel_or_proxy_tool", "ttp.reverse_tunnel"]
+    mitre: ["T1090", "T1572"]
+    timesketch_labels: ["tool.frp", "attack.T1090"]
+
+  ngrok:
+    namespace: tool
+    category: tunneling
+    confidence_when_matched: high
+    match_literals: ["ngrok"]
+    suspicious_arguments: ["tcp", "http", "start", "authtoken"]
+    related_ttps: ["ttp.tunnel_or_proxy_tool", "ttp.remote_access_tool_usage"]
+    mitre: ["T1090", "T1219"]
+    timesketch_labels: ["tool.ngrok", "attack.T1090", "attack.T1219"]
+    source_refs: ["mitre_proxy", "ngrok_project"]
+
+  cloudflared:
+    namespace: tool
+    category: tunneling
+    confidence_when_matched: high
+    match_literals: ["cloudflared"]
+    suspicious_arguments: ["tunnel", "access", "service install"]
+    related_ttps: ["ttp.tunnel_or_proxy_tool", "ttp.persistence_service"]
+    mitre: ["T1090", "T1572", "T1543.002"]
+    timesketch_labels: ["tool.cloudflared", "attack.T1090"]
+
+  tmate:
+    namespace: tool
+    category: remote_shell
+    confidence_when_matched: high
+    match_literals: ["tmate"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.interactive_c2_candidate"]
+    mitre: ["T1219", "T1059.004"]
+    timesketch_labels: ["tool.tmate", "attack.T1219"]
+    source_refs: ["mitre_teamtnt", "mitre_remote_access_tools"]
+
+  sshuttle:
+    namespace: tool
+    category: tunneling
+    confidence_when_matched: medium
+    match_literals: ["sshuttle"]
+    related_ttps: ["ttp.tunnel_or_proxy_tool", "ttp.ssh_lateral_movement_candidate"]
+    mitre: ["T1090", "T1021.004"]
+    timesketch_labels: ["tool.sshuttle", "attack.T1090"]
+
+  socat_netcat:
+    namespace: tool
+    category: network_utility
+    confidence_when_matched: medium
+    match_literals: ["socat", "ncat", "nc", "netcat"]
+    suspicious_arguments: ["-e", "exec:", "pty", "fork", "listen", "reverse"]
+    related_ttps: ["ttp.reverse_shell_or_tunnel_pattern", "ttp.tunnel_or_proxy_tool"]
+    mitre: ["T1090", "T1059.004", "T1105"]
+    timesketch_labels: ["tool.socat", "tool.netcat", "tracequarry.reverse_shell"]
+
+  xmrig:
+    namespace: tool
+    category: mining
+    confidence_when_matched: high
+    match_literals: ["xmrig", "xmr-stak", "minerd", "cpuminer", "kinsing", "kinsing2", "kdevtmpfsi", "kthreaddi"]
+    suspicious_arguments: ["stratum+tcp", "pool", "donate-level", "--coin", "--algo"]
+    related_ttps: ["ttp.miner_execution", "ttp.resource_hijacking"]
+    mitre: ["T1496"]
+    timesketch_labels: ["tool.xmrig", "attack.T1496", "tracequarry.mining"]
+    source_refs: ["mitre_resource_hijacking", "mitre_teamtnt"]
+
+  mass_scan_tools:
+    namespace: tool
+    category: discovery
+    confidence_when_matched: medium
+    match_literals: ["nmap", "masscan", "zmap", "zgrab", "naabu"]
+    related_ttps: ["ttp.network_scanning", "ttp.remote_system_discovery"]
+    mitre: ["T1046", "T1595.001", "T1595.002"]
+    timesketch_labels: ["tool.nmap", "tool.masscan", "attack.T1046"]
+    source_refs: ["mitre_teamtnt", "mitre_akira"]
+
+  credential_tools:
+    namespace: tool
+    category: credential_access
+    confidence_when_matched: high
+    match_literals: ["mimikatz", "lazagne", "pypykatz", "linpeas", "linenum", "linux-exploit-suggester"]
+    related_ttps: ["ttp.credential_material_access", "ttp.privilege_escalation_discovery"]
+    mitre: ["T1552.001", "T1003.008", "T1082", "T1069"]
+    timesketch_labels: ["tracequarry.credential_access", "tracequarry.privesc_enum"]
+
+  archive_tools:
+    namespace: tool
+    category: collection
+    confidence_when_matched: medium
+    match_literals: ["tar", "zip", "7z", "rar", "gzip", "xz"]
+    suspicious_arguments: ["/home", "/root", "/etc", "/var/www", "/srv", "/opt", "--exclude", "-czf", "-cf"]
+    related_ttps: ["ttp.archive_creation_candidate", "ttp.data_staging"]
+    mitre: ["T1560.001", "T1074.001"]
+    timesketch_labels: ["tracequarry.archive", "attack.T1560.001"]
+
+  download_tools:
+    namespace: tool
+    category: ingress_transfer
+    confidence_when_matched: medium
+    match_literals: ["curl", "wget", "fetch", "aria2c"]
+    suspicious_arguments: ["| bash", "| sh", "-o /tmp/", "-O /tmp/", "--no-check-certificate", "chmod +x"]
+    related_ttps: ["ttp.download_execute_chain", "ttp.ingress_tool_transfer"]
+    mitre: ["T1105", "T1059.004"]
+    timesketch_labels: ["tracequarry.download_execute", "attack.T1105"]
+
+  container_tools:
+    namespace: tool
+    category: container_cloud
+    confidence_when_matched: medium
+    match_literals: ["docker", "kubectl", "crictl", "ctr", "nerdctl", "helm", "kubelet"]
+    suspicious_arguments: ["run --privileged", "-v /:/host", "exec", "get secrets", "get pods", "docker.sock"]
+    related_ttps: ["ttp.container_discovery", "ttp.docker_socket_access", "ttp.container_escape_candidate"]
+    mitre: ["T1059.013", "T1609", "T1611", "T1613"]
+    timesketch_labels: ["tracequarry.container", "attack.T1613"]
+    source_refs: ["mitre_teamtnt"]
+
+  filezilla:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["filezilla", "filezilla.xml", "sitemanager.xml", "recentservers.xml"]
+    suspicious_paths: [".config/filezilla", ".filezilla", "sitemanager.xml", "recentservers.xml"]
+    related_ttps: ["ttp.exfil_tool_usage", "ttp.ftp_sftp_exfiltration", "ttp.credential_material_access"]
+    mitre: ["T1048.003", "T1105", "T1552.001"]
+    timesketch_labels: ["tool.filezilla", "tracequarry.exfil", "tracequarry.ftp"]
+    analyst_note: "Common legitimate FTP/SFTP client. High signal when configs appear on servers where it is not baselined, or when paired with archive staging."
+
+  winscp:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["winscp", "winscp.com", "winscp.exe", "winscp.ini"]
+    related_ttps: ["ttp.exfil_tool_usage", "ttp.ftp_sftp_exfiltration"]
+    mitre: ["T1048.003", "T1105"]
+    timesketch_labels: ["tool.winscp", "tracequarry.exfil", "tracequarry.sftp"]
+
+  lftp:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["lftp"]
+    suspicious_arguments: ["mirror", "put", "mput", "sftp://", "ftp://"]
+    related_ttps: ["ttp.exfil_tool_usage", "ttp.ftp_sftp_exfiltration"]
+    mitre: ["T1048.003", "T1105"]
+    timesketch_labels: ["tool.lftp", "tracequarry.exfil"]
+
+  croc_magic_wormhole:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["croc", "magic-wormhole", "wormhole"]
+    related_ttps: ["ttp.peer_to_peer_file_transfer", "ttp.exfil_tool_usage"]
+    mitre: ["T1105", "T1048"]
+    timesketch_labels: ["tool.croc", "tool.magic_wormhole", "tracequarry.file_transfer"]
+
+  transfer_sh_clients:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["transfer.sh", "file.io", "anonfiles", "gofile.io", "pixeldrain"]
+    related_ttps: ["ttp.web_service_exfiltration", "ttp.exfil_tool_usage"]
+    mitre: ["T1567", "T1102.002"]
+    timesketch_labels: ["tracequarry.web_upload", "attack.T1567"]
+
+  minio_mc:
+    namespace: tool
+    category: exfiltration
+    confidence_when_matched: medium
+    match_literals: ["mc"]
+    suspicious_arguments: ["alias set", "mirror", "cp", "pipe", "anonymous set", "s3"]
+    related_ttps: ["ttp.cloud_storage_exfiltration", "ttp.exfil_tool_usage"]
+    mitre: ["T1567.002", "T1048"]
+    timesketch_labels: ["tool.minio_mc", "tracequarry.exfil"]
+
+  restic_borg_backup:
+    namespace: tool
+    category: dual_use_backup_exfiltration
+    confidence_when_matched: medium
+    match_literals: ["restic", "borg", "borgbackup"]
+    suspicious_arguments: ["backup", "init", "repository", "sftp:", "s3:", "b2:", "rclone:"]
+    related_ttps: ["ttp.backup_tool_exfiltration", "ttp.archive_creation_candidate"]
+    mitre: ["T1567.002", "T1560.001", "T1048"]
+    timesketch_labels: ["tool.restic", "tool.borg", "tracequarry.backup_exfil"]
+    analyst_note: "Backup tools are frequently legitimate. Treat as high signal only when newly installed, pointed at unusual remotes, or paired with suspicious account access."
+
+  syncthing:
+    namespace: tool
+    category: file_sync
+    confidence_when_matched: medium
+    match_literals: ["syncthing", "syncthing.service", "config.xml"]
+    suspicious_paths: [".config/syncthing", "/var/lib/syncthing", "/etc/systemd/system/syncthing.service"]
+    related_ttps: ["ttp.file_sync_exfiltration", "ttp.persistence_service"]
+    mitre: ["T1105", "T1567"]
+    timesketch_labels: ["tool.syncthing", "tracequarry.file_sync"]
+
+  tailscale_zerotier:
+    namespace: tool
+    category: overlay_network
+    confidence_when_matched: medium
+    match_literals: ["tailscale", "tailscaled", "zerotier-one", "zerotier-cli"]
+    related_ttps: ["ttp.overlay_network_remote_access", "ttp.tunnel_or_proxy_tool", "ttp.persistence_service"]
+    mitre: ["T1090", "T1133", "T1219"]
+    timesketch_labels: ["tool.tailscale", "tool.zerotier", "tracequarry.overlay_network"]
+    analyst_note: "Often legitimate infrastructure. Raise priority when installed during incident window or on systems without baseline approval."
+
+  mesh_agent_rmm:
+    namespace: tool
+    category: rmm
+    confidence_when_matched: high
+    match_literals: ["meshagent", "meshcentral", "meshagent64", "meshagent.service"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.rmm_tool_usage", "ttp.persistence_service"]
+    mitre: ["T1219", "T1543.002"]
+    timesketch_labels: ["tool.meshagent", "tool.meshcentral", "attack.T1219"]
+    source_refs: ["lolrmm_project", "mitre_remote_access_tools"]
+
+  tacticalrmm:
+    namespace: tool
+    category: rmm
+    confidence_when_matched: high
+    match_literals: ["tacticalrmm", "tacticalagent", "rmmagent"]
+    related_ttps: ["ttp.rmm_tool_usage", "ttp.persistence_service"]
+    mitre: ["T1219", "T1543.002"]
+    timesketch_labels: ["tool.tacticalrmm", "attack.T1219"]
+    source_refs: ["lolrmm_project", "mitre_remote_access_tools"]
+
+  rustdesk:
+    namespace: tool
+    category: remote_access
+    confidence_when_matched: high
+    match_literals: ["rustdesk", "rustdesk.service", "hbbs", "hbbr"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.persistence_service"]
+    mitre: ["T1219", "T1543.002"]
+    timesketch_labels: ["tool.rustdesk", "attack.T1219"]
+    source_refs: ["lolrmm_project", "mitre_remote_access_tools"]
+
+  remmina_vnc_xrdp:
+    namespace: tool
+    category: remote_access
+    confidence_when_matched: medium
+    match_literals: ["remmina", "xrdp", "xrdp-sesman", "vncserver", "x11vnc", "tigervnc", "tightvnc", "ultravnc"]
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.external_remote_service_enabled"]
+    mitre: ["T1219", "T1133", "T1021"]
+    timesketch_labels: ["tool.vnc", "tool.xrdp", "attack.T1219"]
+
+  web_delivery_and_paste_tools:
+    namespace: tool
+    category: ingress_transfer
+    confidence_when_matched: medium
+    match_literals: ["pastebin.com", "raw.githubusercontent.com", "gist.githubusercontent.com", "cdn.discordapp.com", "discord.com/api/webhooks", "telegram.org", "api.telegram.org"]
+    related_ttps: ["ttp.web_service_ingress_or_exfiltration", "ttp.download_execute_chain"]
+    mitre: ["T1105", "T1102", "T1567"]
+    timesketch_labels: ["tracequarry.web_service_transfer", "attack.T1105"]
+
+ttp_tags:
+  ssh_bruteforce:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Many ssh_login_failure events from one source IP, especially against many users."
+    mitre: ["T1110", "T1110.001", "T1110.003"]
+    timesketch_labels: ["ttp.ssh_bruteforce", "attack.T1110"]
+
+  successful_login_after_failures:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "SSH success for the same user/source after repeated prior failures."
+    mitre: ["T1110", "T1078", "T1021.004"]
+    timesketch_labels: ["ttp.success_after_failures", "attack.T1078"]
+
+  valid_account_remote_access:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Successful SSH/VPN/RMM-style access using valid account material."
+    mitre: ["T1078", "T1133", "T1021.004"]
+    timesketch_labels: ["ttp.valid_account", "attack.T1078"]
+
+  outbound_ssh_lateral_candidate:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Observed outbound ssh/scp/rsync from parsed host."
+    mitre: ["T1021.004", "T1105"]
+    timesketch_labels: ["ttp.outbound_ssh", "attack.T1021.004"]
+    analyst_note: "Only call lateral movement when destination is another in-scope host or corroborated internal system."
+
+  download_execute_chain:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "curl/wget/base64 chain pipes into shell or execution prep."
+    mitre: ["T1105", "T1059.004"]
+    timesketch_labels: ["ttp.download_execute", "attack.T1105"]
+
+  reverse_shell_or_tunnel_pattern:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "bash -i, /dev/tcp, mkfifo shell, socat pty, nc -e, ssh reverse tunnel, or equivalent."
+    mitre: ["T1090", "T1095", "T1059.004"]
+    timesketch_labels: ["ttp.reverse_shell", "attack.T1090"]
+
+  remote_access_tool_usage:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "AnyDesk, TeamViewer, LogMeIn, Atera, ScreenConnect, Splashtop, tmate, or similar present/executed."
+    mitre: ["T1219"]
+    timesketch_labels: ["ttp.remote_access_tool", "attack.T1219"]
+    source_refs: ["mitre_remote_access_tools"]
+
+  rmm_tool_usage:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Remote monitoring/management agent observed on a host where it is not baselined."
+    mitre: ["T1219"]
+    timesketch_labels: ["ttp.rmm_tool", "attack.T1219"]
+
+  exfil_tool_usage:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "rclone, MEGAcmd, cloud CLI sync/copy, scp/rsync to external destination, or equivalent."
+    mitre: ["T1567", "T1567.002", "T1048", "T1105"]
+    timesketch_labels: ["ttp.exfil_tool", "attack.T1567"]
+
+  cloud_storage_exfiltration:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Cloud storage command or remote name used to move data off-host."
+    mitre: ["T1567.002"]
+    timesketch_labels: ["ttp.cloud_storage_exfil", "attack.T1567.002"]
+    source_refs: ["mitre_exfil_cloud_storage", "mitre_rclone"]
+
+  archive_creation_candidate:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Archive utility targets sensitive directories or staging paths."
+    mitre: ["T1560.001", "T1074.001"]
+    timesketch_labels: ["ttp.archive_collected_data", "attack.T1560.001"]
+
+  data_staging:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Collected data staged in /tmp, /var/tmp, /dev/shm, /root, /opt, /srv, or unusual archive paths."
+    mitre: ["T1074.001"]
+    timesketch_labels: ["ttp.data_staging", "attack.T1074.001"]
+
+  credential_material_access:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Access to /etc/shadow, SSH private keys, authorized_keys, cloud credentials, kube config, env secrets."
+    mitre: ["T1552.001", "T1552.004", "T1552.005", "T1003.008"]
+    timesketch_labels: ["ttp.credential_access", "attack.T1552"]
+
+  cloud_metadata_access:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Access to 169.254.169.254 or cloud metadata hostnames."
+    mitre: ["T1552.005"]
+    timesketch_labels: ["ttp.cloud_metadata", "attack.T1552.005"]
+
+  account_or_privilege_change:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "useradd, usermod, groupmod, gpasswd, sudo rule changes, passwd changes, account unlocks."
+    mitre: ["T1136.001", "T1098", "T1548.003"]
+    timesketch_labels: ["ttp.account_change", "ttp.privilege_change"]
+
+  uid0_or_sudo_backdoor:
+    namespace: ttp
+    severity: critical
+    confidence_when_matched: high
+    evidence: "Non-root UID 0 user, NOPASSWD sudo, dangerous sudo command allowance, or privileged group addition."
+    mitre: ["T1136.001", "T1098", "T1548.003"]
+    timesketch_labels: ["ttp.privilege_backdoor", "tracequarry.critical"]
+
+  ssh_authorized_key_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Authorized key creation/modification, unrestricted key options, or unusual key owner/path."
+    mitre: ["T1098.004"]
+    timesketch_labels: ["ttp.ssh_authorized_key", "attack.T1098.004"]
+    source_refs: ["mitre_teamtnt"]
+
+  cron_persistence:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Crontab or /etc/cron* additions executing scripts, network tools, miners, or temp-path payloads."
+    mitre: ["T1053.003"]
+    timesketch_labels: ["ttp.cron_persistence", "attack.T1053.003"]
+
+  systemd_persistence:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "New/modified systemd service, systemctl enable/start, suspicious ExecStart."
+    mitre: ["T1543.002", "T1569.003"]
+    timesketch_labels: ["ttp.systemd_persistence", "attack.T1543.002"]
+    source_refs: ["mitre_teamtnt"]
+
+  persistence_service:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "New enabled service for RMM, tunnel, sync, miner, or unusual binary path."
+    mitre: ["T1543.002", "T1569.003"]
+    timesketch_labels: ["ttp.persistence_service", "attack.T1543.002"]
+    source_refs: ["mitre_systemd_service"]
+
+  shell_profile_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: ".bashrc, .bash_profile, /etc/profile, /etc/profile.d, /etc/bash.bashrc, zshrc, or shell login scripts modified to launch commands."
+    mitre: ["T1546.004", "T1037.004"]
+    timesketch_labels: ["ttp.shell_profile_persistence", "attack.T1546.004"]
+
+  rc_local_initd_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "/etc/rc.local, /etc/init.d, rc*.d symlink, chkconfig, update-rc.d, or service wrapper modified."
+    mitre: ["T1037.004", "T1543.002"]
+    timesketch_labels: ["ttp.rc_local", "ttp.initd", "attack.T1037.004"]
+    source_refs: ["mitre_boot_or_logon_init_scripts"]
+
+  udev_rule_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "New or modified /etc/udev/rules.d rule executing a program or script."
+    mitre: ["T1546", "T1037"]
+    timesketch_labels: ["ttp.udev_persistence"]
+
+  package_manager_hook_persistence:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "APT/YUM/DNF hook, postinst script, dpkg trigger, RPM scriptlet, or package repo config used to execute attacker-controlled code."
+    mitre: ["T1546", "T1037", "T1195.002"]
+    timesketch_labels: ["ttp.package_hook_persistence", "attack.T1546"]
+
+  ssh_config_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "sshd_config modified to permit root login, password auth, alternate authorized_keys file, force command, or unexpected port/listen address."
+    mitre: ["T1098.004", "T1021.004", "T1133"]
+    timesketch_labels: ["ttp.ssh_config_persistence", "attack.T1098.004"]
+    source_refs: ["mitre_ssh_authorized_keys", "mitre_external_remote_services"]
+
+  pam_or_ld_preload_backdoor:
+    namespace: ttp
+    severity: critical
+    confidence_when_matched: high
+    evidence: "PAM stack changes, suspicious pam module, /etc/ld.so.preload modification, libprocesshider-like path."
+    mitre: ["T1556.003", "T1574.006", "T1014"]
+    timesketch_labels: ["ttp.pam_backdoor", "ttp.ld_preload", "tracequarry.critical"]
+    source_refs: ["mitre_pam", "mitre_ld_preload"]
+
+  shared_library_hijack_persistence:
+    namespace: ttp
+    severity: critical
+    confidence_when_matched: medium
+    evidence: "ld.so.preload, ld.so.conf.d, LD_PRELOAD in service/profile, suspicious library in trusted path, or writable library path abuse."
+    mitre: ["T1574.006", "T1037"]
+    timesketch_labels: ["ttp.shared_library_hijack", "attack.T1574.006"]
+    source_refs: ["mitre_ld_preload"]
+
+  kernel_module_persistence:
+    namespace: ttp
+    severity: critical
+    confidence_when_matched: medium
+    evidence: "Suspicious kernel module load, /etc/modules-load.d, modprobe.d install directive, DKMS abuse, or unexpected .ko file."
+    mitre: ["T1547.006", "T1014"]
+    timesketch_labels: ["ttp.kernel_module_persistence", "attack.T1547.006"]
+    source_refs: ["mitre_kernel_modules"]
+
+  webshell_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Executable web script in served path, web user command execution, suspicious PHP/JSP/ASP-like shell content, or recently modified web root file."
+    mitre: ["T1505.003", "T1190", "T1059"]
+    timesketch_labels: ["ttp.webshell_persistence", "attack.T1505.003"]
+    source_refs: ["mitre_web_shell"]
+
+  container_persistence:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Restart-always container, privileged container, hostPath mount, Kubernetes DaemonSet/CronJob/Secret abuse, or suspicious image pull."
+    mitre: ["T1610", "T1611", "T1609", "T1613", "T1053.007"]
+    timesketch_labels: ["ttp.container_persistence", "tracequarry.container"]
+
+  tmp_execution_or_artifact:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Execution or payload artifact under /tmp, /var/tmp, /dev/shm, /run."
+    mitre: ["T1059.004", "T1036.005"]
+    timesketch_labels: ["ttp.tmp_execution"]
+
+  log_or_history_tampering:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "history -c, truncation, deletion of auth/syslog/audit logs, or cleared command history."
+    mitre: ["T1070.003", "T1070.004", "T1070.006"]
+    timesketch_labels: ["ttp.log_tampering", "attack.T1070"]
+    source_refs: ["mitre_teamtnt"]
+
+  security_tool_disable:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Disable/uninstall EDR, cloud monitoring agents, iptables/firewalld, auditd, or logging services."
+    mitre: ["T1562.001", "T1685", "T1686"]
+    timesketch_labels: ["ttp.security_tool_disable", "attack.T1562.001"]
+    source_refs: ["mitre_teamtnt", "mitre_akira"]
+
+  docker_socket_access:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "/var/run/docker.sock access, mounted Docker socket, docker API exposure."
+    mitre: ["T1611", "T1609", "T1613"]
+    timesketch_labels: ["ttp.docker_socket", "attack.T1611"]
+    source_refs: ["mitre_teamtnt"]
+
+  container_escape_candidate:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Privileged container, host filesystem mount, nsenter/chroot into host, container runtime abuse."
+    mitre: ["T1611", "T1609"]
+    timesketch_labels: ["ttp.container_escape_candidate", "attack.T1611"]
+
+  miner_execution:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Miner process/binary/config/pool connection or known miner names."
+    mitre: ["T1496"]
+    timesketch_labels: ["ttp.miner_execution", "attack.T1496"]
+    source_refs: ["mitre_resource_hijacking", "mitre_teamtnt"]
+
+  ransomware_or_destructive_impact:
+    namespace: ttp
+    severity: critical
+    confidence_when_matched: medium
+    evidence: "Ransom note, mass file rename/encryption pattern, ESXi/VM encryption command, service stop burst, shadow/backup destruction."
+    mitre: ["T1486", "T1485", "T1490", "T1489"]
+    timesketch_labels: ["ttp.ransomware_impact", "attack.T1486"]
+    source_refs: ["mitre_akira"]
+
+  esxi_or_virtualization_targeting:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "esxcli/vim-cmd usage, VM datastore targeting, .vmdk/.vmx encryption/search, hypervisor service manipulation."
+    mitre: ["T1486", "T1569.003"]
+    timesketch_labels: ["ttp.esxi_targeting", "tracequarry.virtualization"]
+    source_refs: ["mitre_akira"]
+
+  ftp_sftp_exfiltration:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "FTP/SFTP/SCP client or config used to move staged data externally."
+    mitre: ["T1048.003", "T1105"]
+    timesketch_labels: ["ttp.ftp_sftp_exfiltration", "attack.T1048.003"]
+
+  backup_tool_exfiltration:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Backup/sync utility targets external repository or object storage during suspicious window."
+    mitre: ["T1567.002", "T1048", "T1560.001"]
+    timesketch_labels: ["ttp.backup_tool_exfiltration", "tracequarry.backup_exfil"]
+
+  file_sync_exfiltration:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Continuous sync agent, cloud sync, P2P transfer, or unusual sync service configured after compromise."
+    mitre: ["T1567", "T1105", "T1048"]
+    timesketch_labels: ["ttp.file_sync_exfiltration", "attack.T1567"]
+
+  peer_to_peer_file_transfer:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "P2P transfer utility such as croc or magic-wormhole invoked to move files."
+    mitre: ["T1105", "T1048"]
+    timesketch_labels: ["ttp.p2p_file_transfer", "tracequarry.file_transfer"]
+
+  web_service_exfiltration:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "curl/wget/API upload to file sharing, paste, webhook, chat, or cloud web service."
+    mitre: ["T1567", "T1102.002", "T1048"]
+    timesketch_labels: ["ttp.web_service_exfiltration", "attack.T1567"]
+
+  dns_or_icmp_exfiltration_candidate:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: low
+    evidence: "dns tunneling/exfil utilities, long encoded DNS queries, icmp tunneling tools, or command patterns such as iodine/dnscat2/ptunnel."
+    mitre: ["T1048.003", "T1090", "T1071.004"]
+    timesketch_labels: ["ttp.dns_icmp_exfil_candidate"]
+    analyst_note: "Requires network telemetry corroboration; endpoint command traces alone are usually insufficient."
+
+  overlay_network_remote_access:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Tailscale, ZeroTier, or similar overlay network installed/enabled during incident window."
+    mitre: ["T1090", "T1133", "T1219"]
+    timesketch_labels: ["ttp.overlay_network_remote_access", "attack.T1090"]
+
+  external_remote_service_enabled:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "SSH, xrdp, VNC, web admin, VPN, or RMM service enabled or exposed during incident window."
+    mitre: ["T1133", "T1021", "T1219"]
+    timesketch_labels: ["ttp.external_remote_service", "attack.T1133"]
+
+  network_scanning:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "masscan/nmap/zmap/zgrab or high-volume connection probing."
+    mitre: ["T1046", "T1595.001", "T1595.002"]
+    timesketch_labels: ["ttp.network_scanning", "attack.T1046"]
+
+  webshell_or_public_app_compromise_candidate:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Shell-like execution under web roots, suspicious PHP/JSP/ASPX web content, web user executing commands."
+    mitre: ["T1505.003", "T1190", "T1059"]
+    timesketch_labels: ["ttp.webshell_candidate", "attack.T1505.003"]
+
+actor_similarity_profiles:
+  teamtnt_like:
+    namespace: actor_similarity
+    display_name: "TeamTNT-like cloud/container cryptomining tradecraft"
+    actor_refs: ["mitre_teamtnt"]
+    confidence_cap: medium
+    required_evidence_count: 3
+    strong_indicators:
+      - "ttp.docker_socket_access"
+      - "ttp.container_escape_candidate"
+      - "ttp.cloud_metadata_access"
+      - "ttp.ssh_authorized_key_persistence"
+      - "ttp.miner_execution"
+      - "tool.tmate"
+      - "tool.mass_scan_tools"
+    supporting_indicators:
+      - "tool.aws_cli"
+      - "tool.container_tools"
+      - "ttp.security_tool_disable"
+      - "ttp.log_or_history_tampering"
+      - "ttp.systemd_persistence"
+      - "ttp.cron_persistence"
+    mitre_focus: ["T1496", "T1611", "T1613", "T1552.005", "T1098.004", "T1609"]
+    analyst_warning: "Cloud/container mining overlap only. Do not attribute to TeamTNT from these tags alone."
+
+  kinsing_like:
+    namespace: actor_similarity
+    display_name: "Kinsing-like Linux cryptomining campaign"
+    actor_refs: []
+    confidence_cap: medium
+    required_evidence_count: 3
+    strong_indicators:
+      - "tool.xmrig"
+      - "ttp.miner_execution"
+      - "ttp.cron_persistence"
+      - "ttp.tmp_execution_or_artifact"
+      - "ttp.security_tool_disable"
+    supporting_indicators:
+      - "tool.download_tools"
+      - "ttp.download_execute_chain"
+      - "ttp.log_or_history_tampering"
+    mitre_focus: ["T1496", "T1053.003", "T1059.004", "T1105"]
+    analyst_warning: "Cryptomining campaigns heavily reuse tooling. Treat as campaign-style similarity only."
+
+  akira_like:
+    namespace: actor_similarity
+    display_name: "Akira-like ransomware/extortion tradecraft"
+    actor_refs: ["mitre_akira"]
+    confidence_cap: medium
+    required_evidence_count: 3
+    strong_indicators:
+      - "tool.rclone"
+      - "tool.anydesk"
+      - "ttp.cloud_storage_exfiltration"
+      - "ttp.ransomware_or_destructive_impact"
+      - "ttp.esxi_or_virtualization_targeting"
+      - "ttp.valid_account_remote_access"
+    supporting_indicators:
+      - "tool.mass_scan_tools"
+      - "ttp.archive_creation_candidate"
+      - "ttp.security_tool_disable"
+      - "ttp.account_or_privilege_change"
+    mitre_focus: ["T1078", "T1133", "T1219", "T1567.002", "T1486"]
+    analyst_warning: "Ransomware actors and affiliates share tools. This is Akira-like overlap, not attribution."
+
+  lockbit_conti_style_extortion_like:
+    namespace: actor_similarity
+    display_name: "LockBit/Conti-style double-extortion tradecraft"
+    actor_refs: ["mitre_rclone"]
+    confidence_cap: low
+    required_evidence_count: 4
+    strong_indicators:
+      - "tool.rclone"
+      - "tool.megacmd"
+      - "ttp.archive_creation_candidate"
+      - "ttp.cloud_storage_exfiltration"
+      - "ttp.ransomware_or_destructive_impact"
+    supporting_indicators:
+      - "ttp.security_tool_disable"
+      - "ttp.log_or_history_tampering"
+      - "ttp.valid_account_remote_access"
+      - "ttp.remote_access_tool_usage"
+    mitre_focus: ["T1560.001", "T1567.002", "T1486", "T1219"]
+    analyst_warning: "Use as a generic extortion-pattern profile unless external CTI identifies a family."
+
+  medusa_inc_blackbyte_rmm_extortion_like:
+    namespace: actor_similarity
+    display_name: "RMM-heavy ransomware/extortion tradecraft"
+    actor_refs: ["mitre_remote_access_tools", "mitre_rclone"]
+    confidence_cap: low
+    required_evidence_count: 3
+    strong_indicators:
+      - "tool.anydesk"
+      - "tool.atera"
+      - "tool.connectwise_screenconnect"
+      - "tool.splashtop"
+      - "tool.rclone"
+      - "ttp.rmm_tool_usage"
+      - "ttp.cloud_storage_exfiltration"
+    supporting_indicators:
+      - "ttp.valid_account_remote_access"
+      - "ttp.ransomware_or_destructive_impact"
+      - "ttp.archive_creation_candidate"
+    mitre_focus: ["T1219", "T1567.002", "T1078", "T1486"]
+    analyst_warning: "Remote-management tooling is common in both admin and ransomware workflows. Baseline before escalating."
+
+  scattered_spider_unc3944_like:
+    namespace: actor_similarity
+    display_name: "Scattered Spider/UNC3944-like identity and SaaS intrusion tradecraft"
+    actor_refs: ["mitre_rclone"]
+    confidence_cap: low
+    required_evidence_count: 3
+    strong_indicators:
+      - "ttp.valid_account_remote_access"
+      - "tool.rclone"
+      - "ttp.cloud_storage_exfiltration"
+      - "ttp.remote_access_tool_usage"
+    supporting_indicators:
+      - "tool.aws_cli"
+      - "tool.gcloud_cli"
+      - "tool.azure_cli"
+      - "ttp.cloud_credential_access"
+    mitre_focus: ["T1078", "T1219", "T1567.002", "T1552"]
+    analyst_warning: "TraceQuarry host artifacts alone cannot validate social engineering or helpdesk tradecraft."
+
+  apt28_like:
+    namespace: actor_similarity
+    display_name: "APT28-like credential access, collection, and remote access overlap"
+    actor_refs: ["mitre_apt28"]
+    confidence_cap: low
+    required_evidence_count: 4
+    strong_indicators:
+      - "ttp.ssh_bruteforce"
+      - "ttp.valid_account_remote_access"
+      - "ttp.archive_creation_candidate"
+      - "ttp.cloud_storage_exfiltration"
+    supporting_indicators:
+      - "ttp.network_scanning"
+      - "ttp.log_or_history_tampering"
+      - "ttp.outbound_ssh_lateral_candidate"
+    mitre_focus: ["T1110", "T1078", "T1560.001", "T1021.004"]
+    analyst_warning: "APT28 attribution requires campaign, infrastructure, malware, and victimology evidence beyond endpoint overlap."
+
+  apt29_like:
+    namespace: actor_similarity
+    display_name: "APT29-like cloud/credential and stealthy access overlap"
+    actor_refs: ["mitre_apt29"]
+    confidence_cap: low
+    required_evidence_count: 4
+    strong_indicators:
+      - "ttp.cloud_credential_access"
+      - "ttp.cloud_metadata_access"
+      - "ttp.valid_account_remote_access"
+      - "ttp.log_or_history_tampering"
+    supporting_indicators:
+      - "tool.aws_cli"
+      - "tool.gcloud_cli"
+      - "tool.azure_cli"
+      - "ttp.remote_access_tool_usage"
+    mitre_focus: ["T1078", "T1552", "T1552.005", "T1059.009"]
+    analyst_warning: "Cloud credential overlap is common. Do not infer APT29 without external intelligence."
+
+  sandworm_like:
+    namespace: actor_similarity
+    display_name: "Sandworm-like disruptive/destructive tradecraft overlap"
+    actor_refs: ["mitre_sandworm"]
+    confidence_cap: low
+    required_evidence_count: 3
+    strong_indicators:
+      - "ttp.ransomware_or_destructive_impact"
+      - "ttp.security_tool_disable"
+      - "ttp.log_or_history_tampering"
+    supporting_indicators:
+      - "ttp.valid_account_remote_access"
+      - "ttp.outbound_ssh_lateral_candidate"
+      - "ttp.archive_creation_candidate"
+    mitre_focus: ["T1485", "T1486", "T1562.001", "T1070"]
+    analyst_warning: "Destructive behavior alone is not actor attribution."
+
+  lazarus_like:
+    namespace: actor_similarity
+    display_name: "Lazarus-like Linux intrusion and credential/tooling overlap"
+    actor_refs: ["mitre_lazarus"]
+    confidence_cap: low
+    required_evidence_count: 4
+    strong_indicators:
+      - "ttp.credential_material_access"
+      - "ttp.valid_account_remote_access"
+      - "ttp.download_execute_chain"
+      - "ttp.remote_access_tool_usage"
+    supporting_indicators:
+      - "ttp.tmp_execution_or_artifact"
+      - "ttp.log_or_history_tampering"
+      - "ttp.cloud_storage_exfiltration"
+    mitre_focus: ["T1552", "T1078", "T1105", "T1059.004"]
+    analyst_warning: "This profile is broad. Treat as high-level similarity only."
+
+  apt41_like:
+    namespace: actor_similarity
+    display_name: "APT41-like public-app compromise and mixed tooling overlap"
+    actor_refs: ["mitre_apt41"]
+    confidence_cap: low
+    required_evidence_count: 4
+    strong_indicators:
+      - "ttp.webshell_or_public_app_compromise_candidate"
+      - "ttp.credential_material_access"
+      - "ttp.download_execute_chain"
+      - "ttp.remote_access_tool_usage"
+    supporting_indicators:
+      - "ttp.archive_creation_candidate"
+      - "ttp.network_scanning"
+      - "ttp.log_or_history_tampering"
+    mitre_focus: ["T1190", "T1505.003", "T1105", "T1552"]
+    analyst_warning: "Public-app compromise is common across many actors."
+
+  oilrig_ngrok_rmm_like:
+    namespace: actor_similarity
+    display_name: "OilRig-like RMM/tunnel overlap"
+    actor_refs: ["mitre_remote_access_tools"]
+    confidence_cap: low
+    required_evidence_count: 3
+    strong_indicators:
+      - "tool.ngrok"
+      - "ttp.remote_access_tool_usage"
+      - "ttp.tunnel_or_proxy_tool"
+    supporting_indicators:
+      - "ttp.credential_material_access"
+      - "ttp.download_execute_chain"
+    mitre_focus: ["T1219", "T1090", "T1105"]
+    analyst_warning: "ngrok/RMM use is not actor-specific."
+
+  fin7_rmm_loader_like:
+    namespace: actor_similarity
+    display_name: "FIN7-like RMM-assisted loader deployment overlap"
+    actor_refs: ["mitre_fin7", "mitre_remote_access_tools"]
+    confidence_cap: low
+    required_evidence_count: 3
+    strong_indicators:
+      - "tool.atera"
+      - "ttp.rmm_tool_usage"
+      - "ttp.download_execute_chain"
+    supporting_indicators:
+      - "ttp.remote_access_tool_usage"
+      - "ttp.credential_material_access"
+    mitre_focus: ["T1219", "T1105", "T1059"]
+    analyst_warning: "RMM-assisted intrusion is common. Do not label FIN7 without separate CTI."
+
+  generic_linux_intrusion_operator:
+    namespace: actor_similarity
+    display_name: "Generic Linux intrusion operator pattern"
+    actor_refs: []
+    confidence_cap: medium
+    required_evidence_count: 4
+    strong_indicators:
+      - "ttp.ssh_bruteforce"
+      - "ttp.successful_login_after_failures"
+      - "ttp.download_execute_chain"
+      - "ttp.tmp_execution_or_artifact"
+      - "ttp.cron_persistence"
+      - "ttp.log_or_history_tampering"
+    supporting_indicators:
+      - "ttp.credential_material_access"
+      - "ttp.reverse_shell_or_tunnel_pattern"
+      - "ttp.network_scanning"
+    mitre_focus: ["T1110", "T1078", "T1105", "T1059.004", "T1053.003", "T1070"]
+    analyst_warning: "This is intentionally actor-neutral and should often be preferred over named actor similarity."
+
+  generic_cloud_credential_harvester:
+    namespace: actor_similarity
+    display_name: "Generic cloud credential harvesting pattern"
+    actor_refs: ["mitre_teamtnt"]
+    confidence_cap: medium
+    required_evidence_count: 3
+    strong_indicators:
+      - "ttp.cloud_metadata_access"
+      - "ttp.cloud_credential_access"
+      - "tool.aws_cli"
+      - "tool.gcloud_cli"
+      - "tool.azure_cli"
+    supporting_indicators:
+      - "ttp.exfil_tool_usage"
+      - "ttp.log_or_history_tampering"
+      - "ttp.tmp_execution_or_artifact"
+    mitre_focus: ["T1552.005", "T1059.009", "T1567.002"]
+    analyst_warning: "Actor-neutral cloud credential profile."
+
+malware_payload_tags:
+  linux_encryptor_generic:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    family_confidence_policy: "Use generic tag unless ransom note, extension, binary name, or vendor-confirmed artifact supports a family tag."
+    match_literals:
+      - "ransom"
+      - "decrypt"
+      - "restore your files"
+      - "files are encrypted"
+      - "payment"
+      - "bitcoin"
+      - "monero"
+    suspicious_extensions:
+      - ".encrypted"
+      - ".locked"
+      - ".akira"
+      - ".lockbit"
+      - ".blackcat"
+      - ".alphv"
+      - ".blacksuit"
+      - ".royal"
+      - ".babyk"
+      - ".babuk"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting", "ttp.security_tool_disable"]
+    mitre: ["T1486", "T1490", "T1489"]
+    timesketch_labels: ["malware.ransomware_generic", "attack.T1486", "tracequarry.impact"]
+    source_refs: ["mitre_ransomware", "mitre_inhibit_recovery"]
+    analyst_note: "Prefer behavior-level tagging until family-specific artifacts are present."
+
+  akira_linux_encryptor:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["akira", "akira_readme.txt", "akira_readme", ".akira"]
+    behavior_hints:
+      - "Linux/ESXi encryptor"
+      - "virtual disk targeting"
+      - "double extortion with data theft"
+      - "remote access tooling such as AnyDesk or LogMeIn in intrusion context"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1486", "T1567.002", "T1219", "T1078"]
+    timesketch_labels: ["malware.akira_linux", "actor_similarity.akira_like", "attack.T1486"]
+    source_refs: ["mitre_akira", "cisa_akira"]
+    analyst_note: "Family tag should require ransom note/extension/binary corroboration; otherwise use akira_like actor similarity."
+
+  lockbit_linux_encryptor:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["lockbit", "lockbit3", "lockbit_black", ".lockbit", "restore-my-files.txt"]
+    behavior_hints:
+      - "Linux/ESXi variants observed in ransomware operations"
+      - "double extortion"
+      - "backup discovery or deletion"
+      - "StealBit or external exfiltration tooling may appear in broader intrusion"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting", "ttp.cloud_storage_exfiltration"]
+    mitre: ["T1486", "T1490", "T1567"]
+    timesketch_labels: ["malware.lockbit_linux", "attack.T1486"]
+    source_refs: ["cisa_lockbit", "mitre_ransomware"]
+    analyst_note: "Do not infer LockBit from .lockbit-like strings alone; verify note content, binary, or CTI."
+
+  blackcat_alphv_linux_encryptor:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["blackcat", "alphv", "noberus", ".alphv", ".blackcat"]
+    behavior_hints:
+      - "Rust ransomware family"
+      - "Linux/VMware ESXi targeting reported"
+      - "Config-driven encryption behavior"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting", "ttp.security_tool_disable"]
+    mitre: ["T1486", "T1490", "T1562.001"]
+    timesketch_labels: ["malware.blackcat_alphv", "attack.T1486"]
+    source_refs: ["mitre_blackcat", "mitre_ransomware"]
+
+  blacksuit_royal_linux_encryptor:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["blacksuit", "royal", "readme.black", ".royal", ".blacksuit"]
+    behavior_hints:
+      - "Linux/ESXi variants reported for Royal/BlackSuit-style operations"
+      - "intermittent or selective encryption may be observed"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting"]
+    mitre: ["T1486", "T1490"]
+    timesketch_labels: ["malware.blacksuit_royal", "attack.T1486"]
+    source_refs: ["cisa_blacksuit", "mitre_ransomware"]
+
+  babuk_esxi_linux_encryptor:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["babuk", "babyk", ".babuk", ".babyk"]
+    behavior_hints:
+      - "Linux/ESXi-focused encryptor lineage and code reuse across later families"
+      - "VM file targeting"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting"]
+    mitre: ["T1486", "T1490"]
+    timesketch_labels: ["malware.babuk_esxi", "attack.T1486"]
+    source_refs: ["mitre_ransomware"]
+
+  linux_encoder:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: medium
+    match_literals: ["linux.encoder", "readme_to_decrypt.txt", "elf/filecoder", "trojan.linux.ransom"]
+    behavior_hints:
+      - "Linux web server ransomware lineage"
+      - "ransom note in affected directories"
+      - "web app exploitation followed by file encryption"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.webshell_or_public_app_compromise_candidate"]
+    mitre: ["T1486", "T1190"]
+    timesketch_labels: ["malware.linux_encoder", "attack.T1486"]
+
+  mirai_like_botnet:
+    namespace: malware_payload
+    category: botnet_ddos
+    confidence_when_matched: medium
+    match_literals: ["mirai", "satori", "okiru", "owari", "omni", "gafgyt", "bashlite", "qbot", "mozi"]
+    behavior_hints:
+      - "Telnet/SSH default credential scanning"
+      - "multiple CPU architecture payload fetches"
+      - "DDoS command strings"
+      - "competition-killer behavior"
+    related_ttps: ["ttp.network_scanning", "ttp.download_execute_chain", "ttp.security_tool_disable"]
+    mitre: ["T1110.001", "T1046", "T1105", "T1498"]
+    timesketch_labels: ["malware.mirai_like", "tracequarry.botnet", "attack.T1110.001"]
+    source_refs: ["mitre_mirai"]
+    analyst_note: "Family-level naming should be cautious because many Mirai derivatives reuse strings and code."
+
+  xorddos:
+    namespace: malware_payload
+    category: botnet_ddos
+    confidence_when_matched: medium
+    match_literals: ["xorddos", "xor.ddos", "xorddos.linux"]
+    behavior_hints:
+      - "Linux DDoS bot"
+      - "persistence through init/cron/service"
+      - "process hiding or watchdog behavior"
+    related_ttps: ["ttp.persistence_service", "ttp.cron_persistence", "ttp.network_scanning"]
+    mitre: ["T1498", "T1053.003", "T1543.002", "T1105"]
+    timesketch_labels: ["malware.xorddos", "tracequarry.botnet"]
+    source_refs: ["mitre_xorddos"]
+
+  tsunami_kaiten_like:
+    namespace: malware_payload
+    category: botnet_ddos
+    confidence_when_matched: medium
+    match_literals: ["tsunami", "kaiten", "kaiten.c", "ktx", "irc bot"]
+    behavior_hints:
+      - "IRC C2"
+      - "DDoS command support"
+      - "Linux ELF payload"
+    related_ttps: ["ttp.download_execute_chain", "ttp.network_scanning"]
+    mitre: ["T1071.001", "T1498", "T1105"]
+    timesketch_labels: ["malware.tsunami", "tracequarry.botnet"]
+    source_refs: ["mitre_tsunami"]
+
+  chaos_rat_botnet:
+    namespace: malware_payload
+    category: remote_access_botnet
+    confidence_when_matched: medium
+    match_literals: ["chaos", "chaos_rat", "chaos rat"]
+    behavior_hints:
+      - "remote access payload"
+      - "command execution"
+      - "file transfer"
+      - "cross-platform Golang payloads"
+    related_ttps: ["ttp.remote_access_tool_usage", "ttp.download_execute_chain", "ttp.reverse_shell_or_tunnel_pattern"]
+    mitre: ["T1059", "T1105", "T1219"]
+    timesketch_labels: ["malware.chaos_rat", "attack.T1059"]
+    source_refs: ["mitre_chaos"]
+
+  bpfddoor:
+    namespace: malware_payload
+    category: stealth_backdoor
+    confidence_when_matched: high
+    match_literals: ["bpfd", "bpfdoor", "packet_magic", "libpcap", "raw socket"]
+    behavior_hints:
+      - "BPF packet filter backdoor"
+      - "magic packet activation"
+      - "raw socket listener"
+      - "stealthy long-lived Linux backdoor"
+    related_ttps: ["ttp.reverse_shell_or_tunnel_pattern", "ttp.persistence_service", "ttp.shared_library_hijack_persistence"]
+    mitre: ["T1205", "T1095", "T1059.004", "T1014"]
+    timesketch_labels: ["malware.bpfddoor", "tracequarry.backdoor"]
+    source_refs: ["mitre_bpfddoor"]
+
+  symbiote_like_ld_preload_rootkit:
+    namespace: malware_payload
+    category: userland_rootkit
+    confidence_when_matched: high
+    match_literals: ["symbiote", "ld_preload", "ld.so.preload", "libpcap", "libprocesshider"]
+    behavior_hints:
+      - "LD_PRELOAD userland rootkit behavior"
+      - "credential capture"
+      - "process/network hiding"
+      - "shared object injected into processes"
+    related_ttps: ["ttp.shared_library_hijack_persistence", "ttp.pam_or_ld_preload_backdoor", "ttp.credential_material_access"]
+    mitre: ["T1574.006", "T1014", "T1556.003", "T1056"]
+    timesketch_labels: ["malware.symbiote_like", "tracequarry.rootkit", "attack.T1574.006"]
+    source_refs: ["mitre_ld_preload", "mitre_malicious_kernel_module"]
+    analyst_note: "Use behavior tag unless a vendor-confirmed Symbiote artifact is present."
+
+  diamorphine_reptile_rootkit:
+    namespace: malware_payload
+    category: kernel_rootkit
+    confidence_when_matched: high
+    match_literals: ["diamorphine", "reptile", "hide_module", "module_hidden", ".ko"]
+    behavior_hints:
+      - "kernel module rootkit"
+      - "process hiding"
+      - "privilege escalation trigger"
+      - "network or file hiding"
+    related_ttps: ["ttp.kernel_module_persistence", "ttp.security_tool_disable"]
+    mitre: ["T1014", "T1547.006", "T1548"]
+    timesketch_labels: ["malware.kernel_rootkit", "attack.T1014"]
+    source_refs: ["mitre_kernel_modules", "mitre_malicious_kernel_module"]
+
+  kinsing_miner:
+    namespace: malware_payload
+    category: cryptominer
+    confidence_when_matched: high
+    match_literals: ["kinsing", "kinsing2", "kdevtmpfsi", "kinsing.sh", "xmrig", "xmr-stak", "minerd"]
+    behavior_hints:
+      - "miner process"
+      - "pool connection"
+      - "cloud/container exploitation"
+      - "cron/systemd persistence"
+    related_ttps: ["ttp.miner_execution", "ttp.container_escape_candidate", "ttp.cron_persistence", "ttp.systemd_persistence"]
+    mitre: ["T1496", "T1053.003", "T1543.002", "T1611"]
+    timesketch_labels: ["malware.kinsing_like", "tracequarry.mining", "attack.T1496"]
+    source_refs: ["mitre_resource_hijacking"]
+
+  acidrain_acidpour_like_wiper:
+    namespace: malware_payload
+    category: wiper
+    confidence_when_matched: medium
+    match_literals: ["acidrain", "acidpour"]
+    behavior_hints:
+      - "destructive wiping of storage devices"
+      - "embedded/Linux device targeting"
+      - "overwrites device paths"
+    related_ttps: ["ttp.ransomware_or_destructive_impact"]
+    mitre: ["T1485", "T1561"]
+    timesketch_labels: ["malware.wiper", "attack.T1485"]
+    source_refs: ["mitre_data_destruction"]
+    analyst_note: "Endpoint logs may show only destructive commands; require binary or CTI for family name."
+
+  zerocleare_wiper:
+    namespace: malware_payload
+    category: wiper
+    confidence_when_matched: medium
+    match_literals: ["zerocleare", "eldos", "rawdisk"]
+    behavior_hints:
+      - "destructive disk wiping"
+      - "driver-assisted raw disk access"
+    related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.security_tool_disable"]
+    mitre: ["T1485", "T1561"]
+    timesketch_labels: ["malware.zerocleare", "attack.T1485"]
+    source_refs: ["mitre_zerocleare", "mitre_data_destruction"]
+
+  industroyer2_linux_component:
+    namespace: malware_payload
+    category: ics_destructive_payload
+    confidence_when_matched: low
+    match_literals: ["industroyer2", "iec-104", "iec104"]
+    behavior_hints:
+      - "ICS-specific protocol abuse"
+      - "destructive/disruptive operational technology context"
+    related_ttps: ["ttp.ransomware_or_destructive_impact"]
+    mitre: ["T0831", "T0882", "T1485"]
+    timesketch_labels: ["malware.industroyer2", "tracequarry.ics"]
+    source_refs: ["mitre_industroyer2"]
+    analyst_note: "Only relevant for OT/ICS hosts; do not apply from generic Linux server artifacts alone."
+
+  xz_utils_backdoor_like:
+    namespace: malware_payload
+    category: supply_chain_backdoor
+    confidence_when_matched: low
+    match_literals: ["xz", "liblzma", "CVE-2024-3094", "build-to-host.m4", "bad-3-corrupt_lzma2.xz"]
+    behavior_hints:
+      - "supply-chain backdoor pattern"
+      - "trojanized library or build script"
+      - "sshd/libsystemd/liblzma investigation context"
+    related_ttps: ["ttp.shared_library_hijack_persistence", "ttp.package_manager_hook_persistence"]
+    mitre: ["T1195.002", "T1574.006", "T1554"]
+    timesketch_labels: ["malware.supply_chain_backdoor", "tracequarry.supply_chain"]
+    analyst_note: "This is a hunt aid for package/library compromise, not a generic xz usage tag."
+
+  webshell_payload_generic:
+    namespace: malware_payload
+    category: webshell
+    confidence_when_matched: medium
+    match_literals: ["c99", "r57", "b374k", "weevely", "webshell", "cmd=", "system($_", "passthru($_", "shell_exec($_"]
+    behavior_hints:
+      - "web process command execution"
+      - "suspicious web-root script"
+      - "encoded command handlers"
+    related_ttps: ["ttp.webshell_persistence", "ttp.webshell_or_public_app_compromise_candidate", "ttp.download_execute_chain"]
+    mitre: ["T1505.003", "T1059", "T1105"]
+    timesketch_labels: ["malware.webshell_generic", "attack.T1505.003"]
+    source_refs: ["mitre_web_shell"]
+
+  reverse_shell_payload_generic:
+    namespace: malware_payload
+    category: shell_payload
+    confidence_when_matched: high
+    match_literals: ["bash -i", "/dev/tcp/", "mkfifo", "pty.spawn", "socket.connect", "nc -e", "socat exec"]
+    behavior_hints:
+      - "interactive shell callback"
+      - "one-liner payload"
+      - "often observed in shell history, web logs, cron, systemd, or process listings"
+    related_ttps: ["ttp.reverse_shell_or_tunnel_pattern", "ttp.download_execute_chain"]
+    mitre: ["T1059.004", "T1095", "T1105"]
+    timesketch_labels: ["malware.reverse_shell_payload", "tracequarry.shell_payload"]
+
+timesketch_export:
+  event_fields:
+    mandatory:
+      datetime: "UTC timestamp from TraceQuarry event."
+      timestamp_desc: "TraceQuarry timestamp basis, such as log_time, parsed_time, correlated_bodyfile_time."
+      message: "Human-readable event summary."
+    recommended_extra_fields:
+      - tracequarry_event_id
+      - tracequarry_collection_id
+      - tracequarry_collection_host
+      - hostname
+      - source_short
+      - source_path
+      - source_type
+      - raw_line
+      - severity
+      - tool_tags
+      - ttp_tags
+      - mitre_attack_techniques
+      - mitre_attack_tactics
+      - actor_similarity_profiles
+      - actor_similarity_warning
+  label_rules:
+    tool_tags: "Export as tool.<name>"
+    ttp_tags: "Export as ttp.<name>"
+    mitre: "Export as attack.<technique_id>"
+    severity: "Export as tracequarry.<severity>"
+    actor_similarity: "Export as actor_similarity.<profile_id> only when confidence threshold is met."
+  saved_search_templates:
+    - name: "TraceQuarry: High severity Linux findings"
+      query: 'severity:("high" OR "critical") OR label:"tracequarry.high" OR label:"tracequarry.critical"'
+    - name: "TraceQuarry: SSH brute force to success"
+      query: 'label:"ttp.ssh_bruteforce" OR label:"ttp.success_after_failures"'
+    - name: "TraceQuarry: Exfiltration tooling"
+      query: 'label:"tracequarry.exfil" OR label:"tool.rclone" OR label:"tool.megacmd"'
+    - name: "TraceQuarry: Remote access tooling"
+      query: 'label:"attack.T1219" OR label:"tracequarry.remote_access"'
+    - name: "TraceQuarry: Persistence"
+      query: 'label:"ttp.cron_persistence" OR label:"ttp.systemd_persistence" OR label:"ttp.ssh_authorized_key"'
+    - name: "TraceQuarry: Actor similarity review"
+      query: 'label:"actor_similarity.*"'

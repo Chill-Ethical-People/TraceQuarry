@@ -1,0 +1,50 @@
+[project]
+name = "tracequarry"
+version = "0.4.0b1"
+description = "TraceQuarry: UAC-aware Linux forensic timeline parser with TTP enrichment."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+authors = [{name = "Chill Ethical People"}]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+keywords = ["dfir", "forensics", "incident-response", "linux", "timeline", "uac"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = ["PyYAML>=6.0.2,<7"]
+
+[project.urls]
+Homepage = "https://github.com/kensho-cep/tracequarry"
+Documentation = "https://github.com/kensho-cep/tracequarry#readme"
+Issues = "https://github.com/kensho-cep/tracequarry/issues"
+Security = "https://github.com/kensho-cep/tracequarry/security/policy"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[project.scripts]
+tracequarry = "uac_parser.cli:main"
+tracequarry-web = "uac_parser.web:main"
+uac-timeline = "uac_parser.cli:main"
+uac-timeline-web = "uac_parser.web:main"
+
+[tool.setuptools.packages.find]
+include = ["uac_parser*"]
+
+[tool.setuptools.data-files]
+"share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/linux_ttps.yml", "rules/tools.yml", "rules/actors.yml", "rules/investigation_profiles.yml"]
+"share/tracequarry/assets" = ["assets/cep-mark.svg", "assets/tracequarry-favicon.svg", "assets/tracequarry-lockup.svg", "assets/tracequarry-mark.svg", "assets/tracequarry-platform-icon.svg"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"

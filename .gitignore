@@ -1,0 +1,61 @@
+# Local OS/editor noise
+.DS_Store
+
+# Python runtime/cache artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Real evidence and generated extraction trees
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+extracted/
+*.dmp
+*.raw
+*.mem
+*.vmem
+*.lime
+*.evtx
+*.pcap
+*.pcapng
+*.img
+*.iso
+*.vhd
+*.vhdx
+*.vmdk
+*.exe
+*.dll
+*.sys
+*.jar
+*.class
+
+# Parser and browser-run outputs
+tests/out/
+web_runs/
+uat_results/
+tests/synthetic_uac/generated/
+tests/synthetic_uac/archives/
+tests/synthetic_uac/analysis/
+
+# Local virtual environments
+.venv/
+venv/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*

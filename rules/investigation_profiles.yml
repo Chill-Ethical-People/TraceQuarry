@@ -1,0 +1,155 @@
+metadata:
+  schema_version: "1.0"
+  policy: "Profiles prioritize evidence and investigative pivots. They do not suppress evidence or establish attribution."
+
+profiles:
+  comprehensive:
+    label: Comprehensive triage
+    description: Broad Linux compromise review when the intrusion pattern is not yet known.
+    hypothesis: A Linux host may be compromised through an unknown initial-access path.
+    focus_terms: [authentication, persistence, privilege, credential, exfil, c2, impact, tooling]
+    mitre: [T1078, T1059.004, T1548.003, T1053.003, T1543.002, T1105, T1070]
+    source_groups: [authentication, execution, persistence, accounts, network, filesystem]
+    checklist:
+      - question: Did suspicious authentication precede privileged activity?
+        terms: [ssh_login_failure, ssh_login_success, sudo_command, valid_account]
+      - question: Was an executable or script introduced and launched?
+        terms: [download_execute_chain, tmp_execution, ingress_tool_transfer, chmod_executable]
+      - question: Were persistence or account-control mechanisms changed?
+        terms: [persistence, account_change, authorized_key, pam, systemd, cron]
+      - question: Was data staged, transferred, or destroyed?
+        terms: [archive, exfil, file_transfer, destructive, impact]
+    pivots:
+      - Validate the earliest high-signal event against its raw source line.
+      - Identify the user, process ancestry, source IP, and destination for each privileged action.
+      - Preserve referenced binaries, scripts, keys, and configuration files before remediation.
+
+  ransomware_extortion:
+    label: Ransomware / extortion
+    description: Prioritize intrusion, staging, exfiltration, encryption, recovery inhibition, and cleanup.
+    hypothesis: An operator may have staged or exfiltrated data before destructive impact.
+    focus_terms: [ransomware, exfil, archive, destructive, impact, log_tampering, ssh_bruteforce, rclone]
+    mitre: [T1486, T1485, T1490, T1560.001, T1567, T1070, T1021.004]
+    source_groups: [authentication, execution, network, filesystem, persistence]
+    checklist:
+      - question: Is there a defensible initial-access or valid-account sequence?
+        terms: [ssh_bruteforce, valid_account, ssh_login_success, authentication]
+      - question: Was sensitive data archived or staged before impact?
+        terms: [archive_creation_candidate, archive, collection]
+      - question: Was an exfiltration or cloud-transfer tool executed?
+        terms: [exfil_tool_usage, rclone, megacmd, azcopy, file_transfer]
+      - question: Is destructive or encryption-like behavior corroborated by filesystem evidence?
+        terms: [destructive_command, destructive, ransomware, impact]
+      - question: Were logs, history, or recovery mechanisms altered?
+        terms: [log_or_history_tampering, log_tampering, inhibit_recovery]
+    pivots:
+      - Establish the last known-good state and the first affected file timestamp.
+      - Correlate archives and transfer destinations with proxy, DNS, firewall, and cloud audit logs.
+      - Preserve ransom notes, suspicious binaries, and filesystem metadata for malware validation.
+
+  public_facing_exploitation:
+    label: Software exploitation
+    description: Follow suspicious web or service requests into payload transfer, execution, shell access, and persistence.
+    hypothesis: A public-facing service may have been exploited to execute attacker-controlled code.
+    focus_terms: [web, exploit, shell, download, tmp_execution, reverse_shell, cron, systemd]
+    mitre: [T1190, T1505.003, T1105, T1059.004, T1095, T1053.003]
+    source_groups: [web, execution, network, filesystem, persistence]
+    checklist:
+      - question: Is there an exploit-like request or web-shell interaction?
+        terms: [web_attack_candidate, web_request, web_shell, shell.php, traversal]
+      - question: Did the service account create or execute a new file?
+        terms: [download_execute_chain, tmp_execution, audit_exec_from_tmp, chmod_executable]
+      - question: Did execution lead to a reverse shell, tunnel, or suspicious connection?
+        terms: [reverse_shell_or_tunnel_pattern, reverse_shell, tunnel, outbound]
+      - question: Was persistence created after the suspected exploit?
+        terms: [suspicious_cron_entry, suspicious_systemd_execstart, persistence]
+    pivots:
+      - Align web requests, file creation, audit execution, and outbound connections to the second.
+      - Review the vulnerable application version, deployment history, and service-account permissions.
+      - Preserve uploaded files, temporary payloads, application logs, and container layers.
+
+  credential_compromise:
+    label: Credential compromise
+    description: Prioritize authentication anomalies, secret access, account changes, sudo, and remote access.
+    hypothesis: Stolen credentials or keys may have enabled valid-account access and privilege escalation.
+    focus_terms: [authentication, credential, password, authorized_key, sudo, account, ssh]
+    mitre: [T1078, T1110, T1552.001, T1098.004, T1548.003]
+    source_groups: [authentication, accounts, privilege, execution, network]
+    checklist:
+      - question: Did failures, unusual sources, or unusual hours precede successful access?
+        terms: [ssh_login_failure, ssh_login_success, ssh_bruteforce, valid_account]
+      - question: Were passwords, keys, tokens, or secret stores accessed?
+        terms: [credential_material_access, credential_access, shadow, authorized_keys]
+      - question: Were accounts, groups, passwords, SSH keys, or sudo rules changed?
+        terms: [account_change, password_changed, privileged_group, authorized_key, sudo]
+      - question: Did the account access another host or transfer files?
+        terms: [outbound_ssh, outbound_file_transfer, lateral_movement]
+    pivots:
+      - Compare source IPs, key fingerprints, user agents, and login times with identity-provider telemetry.
+      - Review password, group, sudoers, and authorized-key changes against approved administration records.
+      - Scope the same username, key, and source infrastructure across all collected hosts.
+
+  persistence_backdoor:
+    label: Persistence / backdoor
+    description: Focus on startup, authentication, loader, SSH-key, scheduled-task, and account persistence.
+    hypothesis: The host may contain one or more mechanisms intended to survive process termination or reboot.
+    focus_terms: [persistence, pam, ld_preload, systemd, cron, authorized_key, profile, rc_local, kernel]
+    mitre: [T1543.002, T1053.003, T1556.003, T1574.006, T1098.004, T1547.006]
+    source_groups: [persistence, accounts, filesystem, execution]
+    checklist:
+      - question: Were systemd, cron, profile, or rc.local startup paths changed?
+        terms: [systemd, cron, profile, rc_local, persistence]
+      - question: Were PAM, dynamic-loader, or kernel-extension mechanisms modified?
+        terms: [pam, ld_so_preload, kernel_module, loader]
+      - question: Were SSH keys, users, groups, or sudo rules added?
+        terms: [authorized_key, user_created, privileged_group, sudo]
+      - question: Does each persistence target reference a preserved executable or script?
+        terms: [suspicious_path, tmp_execution, executable, script]
+    pivots:
+      - Hash and stat every referenced persistence target before disabling it.
+      - Compare current configuration with package defaults, backups, and configuration management.
+      - Review activation logs and process/network evidence to distinguish dormant from active persistence.
+
+  cryptomining_resource_hijacking:
+    label: Cryptomining / resource hijacking
+    description: Prioritize miner execution, persistence, pool connections, cloud credentials, and container abuse.
+    hypothesis: Compute resources may have been hijacked for mining or other unauthorized workloads.
+    focus_terms: [miner, xmrig, kinsing, resource_hijacking, docker, kubectl, cloud, tmp_execution]
+    mitre: [T1496, T1611, T1552.005, T1053.003, T1543.002]
+    source_groups: [execution, process, network, persistence, cloud_container]
+    checklist:
+      - question: Is a known miner or miner-like command/process present?
+        terms: [miner_execution, xmrig, minerd, xmr-stak, kinsing]
+      - question: Are mining-pool or unusual long-lived outbound connections visible?
+        terms: [pool, stratum, outbound, network_state]
+      - question: Was persistence created for the workload?
+        terms: [cron, systemd, persistence]
+      - question: Were cloud metadata, containers, or orchestrator credentials accessed?
+        terms: [cloud_metadata_access, docker_socket_access, kubectl, cloud_container]
+    pivots:
+      - Correlate CPU spikes and process start times with network flows and cloud billing anomalies.
+      - Scope wallet addresses, pool domains, image names, and deployment objects across the environment.
+      - Review exposed services and container control planes for the initial-access path.
+
+  apt_like_intrusion:
+    label: Advanced intrusion tradecraft
+    description: Follow low-noise valid-account activity through credentials, layered persistence, tunneling, and cross-host access.
+    hypothesis: A capable operator may be maintaining durable access and conducting selective collection.
+    focus_terms: [valid_account, credential, persistence, tunnel, proxy, exfil, outbound_ssh, defense_evasion]
+    mitre: [T1078, T1552.001, T1090, T1098.004, T1556.003, T1574.006, T1021.004]
+    source_groups: [authentication, execution, persistence, accounts, network, filesystem]
+    checklist:
+      - question: Is low-noise valid-account access supported by raw authentication evidence?
+        terms: [ssh_login_success, valid_account, publickey]
+      - question: Were credential material or sensitive collections accessed?
+        terms: [credential_material_access, credential_access, archive, collection]
+      - question: Are multiple independent persistence mechanisms present?
+        terms: [pam, ld_preload, systemd, authorized_key, sudo, persistence]
+      - question: Is tunneling or proxy tooling corroborated by a network connection?
+        terms: [tunnel_or_proxy_tool, chisel, frp, ngrok, outbound]
+      - question: Is host-to-host access directly evidenced?
+        terms: [outbound_ssh_command, outbound_ssh_connection, outbound_file_transfer, lateral_movement]
+    pivots:
+      - Build an identity-centric timeline spanning authentication, sudo, secrets, and remote access.
+      - Correlate tunnel destinations and SSH targets across endpoint, firewall, DNS, and identity telemetry.
+      - Report actor overlap only as profile similarity with explicit supporting and contradictory evidence.

@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install development tools
+        run: python -m pip install --upgrade pip build twine
+      - name: Install TraceQuarry
+        run: python -m pip install -e .
+      - name: Run regression suite
+        run: python -m unittest discover -s tests -v
+      - name: Build distributions
+        run: python -m build
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+      - name: Validate installed wheel and packaged resources
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          cd "$RUNNER_TEMP"
+          tracequarry --help
+          tracequarry-web --help
+          python -c "from uac_parser.enrich.rule_registry import load_registry; assert load_registry()['metadata']['schema_version'] == '1.0'"
+          python -c "from uac_parser.resources import resource_file; assert resource_file('assets', 'cep-mark.svg').is_file()"

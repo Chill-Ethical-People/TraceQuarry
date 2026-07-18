@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 290" role="img" aria-labelledby="title desc">
+  <title id="title">TraceQuarry</title>
+  <desc id="desc">TraceQuarry logo lockup with the reference-matched stratified T mark.</desc>
+  <g transform="translate(0 0)">
+    <path d="M145 39H286L305 50H126Z" fill="#F4F2ED"/>
+    <path d="M101 64H331L344 78H88Z" fill="#F4F2ED"/>
+    <path d="M64 93H318V107H64Z" fill="#F4F2ED"/>
+    <path d="M64 122H319V137H64Z" fill="#F4F2ED"/>
+    <path d="M64 151H137L160 174H141L124 160H64Z" fill="#747C87"/>
+    <path d="M64 181H141L168 204H147L126 190H64Z" fill="#535D69"/>
+    <path d="M69 211H136L158 232H124L91 222H69Z" fill="#323C49"/>
+    <path d="M225 151H319V166H255L231 185H206L236 160H225Z" fill="#747C87"/>
+    <path d="M246 181H319V196H274L253 211H226L258 189H246Z" fill="#535D69"/>
+    <path d="M276 211H319V226H300L276 241H246L274 224H276Z" fill="#323C49"/>
+    <path d="M64 122H186V138H64Z" fill="#F4F2ED"/>
+    <path d="M205 122H319V138H205Z" fill="#F4F2ED"/>
+    <path d="M177 122H194V249H177Z" fill="#F4F2ED"/>
+    <path d="M213 122H230V249H213Z" fill="#F4F2ED"/>
+    <path d="M194 122H213V138H194Z" fill="#0E1626"/>
+    <path d="M229 160L278 197H329L369 164H386" fill="none" stroke="#E5A84B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="389" cy="164" r="9" fill="#0E1626" stroke="#E5A84B" stroke-width="5"/>
+  </g>
+  <text x="430" y="139" fill="#EDEFE9" font-family="IBM Plex Mono, Space Mono, monospace" font-size="46" font-weight="700" letter-spacing="10">TRACE</text>
+  <text x="637" y="139" fill="#7C8696" font-family="IBM Plex Mono, Space Mono, monospace" font-size="46" font-weight="500" letter-spacing="10">QUARRY</text>
+  <line x1="430" y1="168" x2="500" y2="168" stroke="#E5A84B" stroke-width="4"/>
+  <text x="430" y="202" fill="#9DBE8D" font-family="IBM Plex Mono, Space Mono, monospace" font-size="14" font-weight="400" letter-spacing="4">EXCAVATE THE TIMELINE</text>
+</svg>

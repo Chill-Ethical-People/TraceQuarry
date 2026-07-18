@@ -1,0 +1,5 @@
+type=SYSCALL msg=audit(1781604100.123:77): arch=c000003e syscall=59 success=yes exit=0 a0=55b exe="/usr/bin/bash" comm="bash" pid=222 uid=0 auid=0 key="exec_from_tmp"
+type=EXECVE msg=audit(1781604100.123:77): argc=2 a0="/tmp/kworker" a1="--debug"
+type=CWD msg=audit(1781604100.123:77): cwd="/root"
+type=PATH msg=audit(1781604100.123:77): item=0 name="/tmp/kworker" inode=123 dev=08:01 mode=0100755 ouid=0 ogid=0
+

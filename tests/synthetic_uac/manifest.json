@@ -1,0 +1,60 @@
+{
+  "collections": [
+    {
+      "synthetic": true,
+      "scenario": "ransomware",
+      "host": "finance-db01",
+      "incident_start": "2026-07-10T01:00:00Z",
+      "incident_end": "2026-07-10T02:30:00Z",
+      "description": "SSH brute force, archive staging, rclone exfiltration, destructive impact, and cleanup.",
+      "expected_analyst_leads": [
+        "successful SSH login after repeated failures",
+        "archive creation",
+        "rclone/exfiltration tooling",
+        "destructive command",
+        "ransomware/extortion-like tradecraft",
+        "history or log tampering"
+      ],
+      "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
+      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/ransomware",
+      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-ransomware-202607.tar.gz"
+    },
+    {
+      "synthetic": true,
+      "scenario": "software_exploitation",
+      "host": "web-app01",
+      "incident_start": "2026-07-11T08:00:00Z",
+      "incident_end": "2026-07-11T09:00:00Z",
+      "description": "Public web exploitation followed by payload transfer, tmp execution, reverse shell, and persistence.",
+      "expected_analyst_leads": [
+        "web attack candidate",
+        "download and execution behavior",
+        "execution from /tmp",
+        "reverse shell or suspicious outbound connection",
+        "cron persistence"
+      ],
+      "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
+      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/software_exploitation",
+      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-software_exploitation-202607.tar.gz"
+    },
+    {
+      "synthetic": true,
+      "scenario": "apt_like",
+      "host": "research-jump01",
+      "incident_start": "2026-07-12T03:00:00Z",
+      "incident_end": "2026-07-12T05:00:00Z",
+      "description": "Low-noise valid-account access, credential access, layered persistence, tunneling, and internal SSH.",
+      "expected_analyst_leads": [
+        "valid-account SSH access",
+        "credential material access",
+        "SSH key, PAM, and systemd persistence",
+        "chisel tunneling",
+        "outbound SSH or file transfer",
+        "account lifecycle changes"
+      ],
+      "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
+      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/apt_like",
+      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-apt_like-202607.tar.gz"
+    }
+  ]
+}

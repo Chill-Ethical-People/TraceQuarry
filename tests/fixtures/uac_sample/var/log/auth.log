@@ -1,0 +1,8 @@
+Jun 16 10:00:01 host01 sshd[100]: Failed password for root from 203.0.113.10 port 50001 ssh2
+Jun 16 10:00:05 host01 sshd[101]: Failed password for root from 203.0.113.10 port 50002 ssh2
+Jun 16 10:00:09 host01 sshd[102]: Failed password for root from 203.0.113.10 port 50003 ssh2
+Jun 16 10:00:13 host01 sshd[103]: Failed password for root from 203.0.113.10 port 50004 ssh2
+Jun 16 10:00:17 host01 sshd[104]: Failed password for root from 203.0.113.10 port 50005 ssh2
+Jun 16 10:01:00 host01 sshd[105]: Accepted password for root from 203.0.113.10 port 50006 ssh2
+Jun 16 10:03:00 host01 sudo: root : TTY=pts/0 ; PWD=/root ; USER=root ; COMMAND=/usr/bin/systemctl enable kworker.service
+
