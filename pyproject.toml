@@ -27,7 +27,7 @@ Issues = "https://github.com/kensho-cep/tracequarry/issues"
 Security = "https://github.com/kensho-cep/tracequarry/security/policy"
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9"]
+dev = ["pytest>=8,<10"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
