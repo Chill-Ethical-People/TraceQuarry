@@ -1,6 +1,13 @@
 # TraceQuarry
 
 <p align="center">
+  <a href="https://github.com/kensho-cep/tracequarry/actions/workflows/ci.yml"><img src="https://github.com/kensho-cep/tracequarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/kensho-cep/tracequarry/actions/workflows/codeql.yml"><img src="https://github.com/kensho-cep/tracequarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-5C7F67.svg" alt="Apache-2.0 license"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
+</p>
+
+<p align="center">
   <img src="assets/tracequarry-favicon.svg" width="168" alt="TraceQuarry layered timeline mark">
 </p>
 
