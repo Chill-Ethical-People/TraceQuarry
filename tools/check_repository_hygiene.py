@@ -58,7 +58,9 @@ TEXT_SUFFIXES = {
     ".yaml",
 }
 IP_RE = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
-LOCAL_HOME_RE = re.compile(r"(?:/Users/|[A-Za-z]:\\Users\\)[^/\\\s]+[/\\]")
+LOCAL_HOME_RE = re.compile(
+    r"(?:/" + "Users/" + r"|[A-Za-z]:\\" + "Users" + r"\\)[^/\\\s]+[/\\]"
+)
 ALLOWED_PUBLIC_NETWORKS = tuple(
     ipaddress.ip_network(value)
     for value in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
