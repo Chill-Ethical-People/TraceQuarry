@@ -1,7 +1,7 @@
 # TraceQuarry
 
 <p align="center">
-  <img src="assets/tracequarry-platform-icon.svg" width="112" alt="TraceQuarry platform icon">
+  <img src="assets/tracequarry-favicon.svg" width="168" alt="TraceQuarry layered timeline mark">
 </p>
 
 TraceQuarry is a local-first Linux DFIR workbench for Unix-like Artifacts
