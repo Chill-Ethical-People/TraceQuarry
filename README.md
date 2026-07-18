@@ -512,3 +512,6 @@ python3 -m pip install tracequarry-*.whl
 Security-sensitive issues should be reported privately through
 [GitHub Security Advisories](https://github.com/kensho-cep/tracequarry/security/advisories/new)
 or by email to [`contact@chillethicalpeople.com`](mailto:contact@chillethicalpeople.com).
+
+Maintainers should complete the [public release checklist](docs/public-release-checklist.md)
+when changing repository visibility or publishing a release tag.
