@@ -16,8 +16,8 @@
         "history or log tampering"
       ],
       "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
-      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/ransomware",
-      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-ransomware-202607.tar.gz"
+      "directory": "tests/synthetic_uac/generated/ransomware",
+      "archive": "tests/synthetic_uac/archives/uac-synthetic-ransomware-202607.tar.gz"
     },
     {
       "synthetic": true,
@@ -34,8 +34,8 @@
         "cron persistence"
       ],
       "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
-      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/software_exploitation",
-      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-software_exploitation-202607.tar.gz"
+      "directory": "tests/synthetic_uac/generated/software_exploitation",
+      "archive": "tests/synthetic_uac/archives/uac-synthetic-software_exploitation-202607.tar.gz"
     },
     {
       "synthetic": true,
@@ -53,8 +53,8 @@
         "account lifecycle changes"
       ],
       "safety": "All IPs and domains use documentation or reserved ranges. No executable payload is included.",
-      "directory": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/generated/apt_like",
-      "archive": "/Users/f1h3/Documents/Chill Ethical People/uac_parser/tests/synthetic_uac/archives/uac-synthetic-apt_like-202607.tar.gz"
+      "directory": "tests/synthetic_uac/generated/apt_like",
+      "archive": "tests/synthetic_uac/archives/uac-synthetic-apt_like-202607.tar.gz"
     }
   ]
 }

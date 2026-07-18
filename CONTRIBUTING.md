@@ -23,8 +23,16 @@ or third-party content that you do not have permission to share.
   behavior.
 - Do not include real UAC archives, extracted evidence trees, customer names,
   private IP ownership details, credentials, tokens, or generated case outputs.
+- Keep test records synthetic and text-only. Use RFC 5737 documentation IPs,
+  `.invalid` domains, and obvious credential placeholders.
 
 ## Development Smoke Test
+
+Run the repository hygiene gate before testing:
+
+```bash
+python3 tools/check_repository_hygiene.py
+```
 
 ```bash
 cd tracequarry

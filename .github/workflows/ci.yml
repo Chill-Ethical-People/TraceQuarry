@@ -26,7 +26,11 @@ jobs:
       - name: Install development tools
         run: python -m pip install --upgrade pip build twine
       - name: Install TraceQuarry
-        run: python -m pip install -e .
+        run: python -m pip install -e '.[dev]'
+      - name: Reject evidence and workstation metadata
+        run: python tools/check_repository_hygiene.py
+      - name: Check Python quality
+        run: ruff check uac_parser tests tools
       - name: Run regression suite
         run: python -m unittest discover -s tests -v
       - name: Build distributions
