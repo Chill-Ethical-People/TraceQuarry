@@ -383,10 +383,18 @@ Current coverage is tuned for Linux intrusion triage:
 Actor-relevant matches are tradecraft hints only. Do not report them as
 attribution without independent threat intelligence.
 
-Tool enrichment is loaded from `rules/tagging_registry.yml` at runtime. Each
-matched event receives the registry tool ID, category, confidence, and MITRE
-mapping. The registry hash is preserved in the run manifest so analysts can
-identify the exact detection content used for a case.
+Tool, TTP, malware/payload metadata, and non-attributive actor-similarity
+profiles are consolidated in `rules/tagging_registry.yml`. Tool and TTP rules
+enrich events at runtime; actor profiles prioritize combinations of observed
+signals without claiming attribution. The registry hash is preserved in the run
+manifest so analysts can identify the exact detection content used for a case.
+
+Community additions are welcome. See the [detection-pack contribution guide](rules/README.md)
+and validate changes before submitting them:
+
+```bash
+PYTHONPATH=. python3 -m uac_parser.rules_cli
+```
 
 ## Evidence Readiness
 

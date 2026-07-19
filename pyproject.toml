@@ -76,6 +76,7 @@ testpaths = ["tests"]
 [project.scripts]
 tracequarry = "uac_parser.cli:main"
 tracequarry-web = "uac_parser.web:main"
+tracequarry-rules = "uac_parser.rules_cli:main"
 uac-timeline = "uac_parser.cli:main"
 uac-timeline-web = "uac_parser.web:main"
 
@@ -83,7 +84,7 @@ uac-timeline-web = "uac_parser.web:main"
 include = ["uac_parser*"]
 
 [tool.setuptools.data-files]
-"share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/linux_ttps.yml", "rules/tools.yml", "rules/actors.yml", "rules/investigation_profiles.yml"]
+"share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/investigation_profiles.yml", "rules/README.md"]
 "share/tracequarry/assets" = ["assets/cep-mark.svg", "assets/tracequarry-favicon.svg", "assets/tracequarry-lockup.svg", "assets/tracequarry-mark.svg", "assets/tracequarry-platform-icon.svg"]
 
 [build-system]

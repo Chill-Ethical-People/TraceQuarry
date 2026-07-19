@@ -1,8 +1,0 @@
-# Actor/campaign tradecraft hints. These are not attribution rules.
-teamtnt_like:
-  behaviors: [docker_socket_access, cloud_credential_access, miner_execution, cron_modified]
-kinsing_like:
-  behaviors: [redis_abuse, miner_execution, cron_modified, execution_from_tmp]
-akira_lockbit_alphv_like:
-  behaviors: [ransomware_note_candidate, service_stop_burst, mass_file_rename_candidate, exfil_tool_usage]
-

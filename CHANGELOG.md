@@ -7,6 +7,10 @@ All notable TraceQuarry changes are documented here. The project follows
 
 ### Added
 
+- Added a canonical contributor-maintained YAML detection pack for tools, TTPs,
+  malware/payload metadata, and non-attributive actor-similarity profiles.
+- Added runtime YAML TTP and actor-profile evaluation, strict duplicate/schema
+  validation, a `tracequarry-rules` validator, and rule-authoring guidance.
 - Enforced Ruff formatting and linting, strict MyPy checks, Bandit scanning,
   dependency auditing, and a 75% branch-coverage floor in CI and release workflows.
 - Added Snyk Open Source CI testing, scheduled monitoring, and a dependency

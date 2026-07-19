@@ -11,11 +11,12 @@
 #   and investigation corroboration.
 #
 # Status:
-#   Runtime registry. TraceQuarry validates and loads tool_tags for event
-#   enrichment; behavioral correlations remain implemented in Python.
+#   Canonical runtime detection pack. TraceQuarry validates and loads tool_tags,
+#   ttp_tags, and actor_similarity_profiles. Complex correlations implemented in
+#   Python emit detection names that are mapped through this registry.
 
 metadata:
-  schema_version: "1.0"
+  schema_version: "1.1"
   registry_name: tracequarry_linux_tagging_registry
   created: "2026-07-01"
   owner: "Chill Ethical People"
@@ -585,6 +586,7 @@ ttp_tags:
     evidence: "Successful SSH/VPN/RMM-style access using valid account material."
     mitre: ["T1078", "T1133", "T1021.004"]
     timesketch_labels: ["ttp.valid_account", "attack.T1078"]
+    match_event_actions: ["ssh_login_success"]
 
   outbound_ssh_lateral_candidate:
     namespace: ttp
@@ -593,6 +595,7 @@ ttp_tags:
     evidence: "Observed outbound ssh/scp/rsync from parsed host."
     mitre: ["T1021.004", "T1105"]
     timesketch_labels: ["ttp.outbound_ssh", "attack.T1021.004"]
+    match_detection_names: ["outbound_ssh_command", "outbound_file_transfer_command"]
     analyst_note: "Only call lateral movement when destination is another in-scope host or corroborated internal system."
 
   download_execute_chain:
@@ -602,6 +605,7 @@ ttp_tags:
     evidence: "curl/wget/base64 chain pipes into shell or execution prep."
     mitre: ["T1105", "T1059.004"]
     timesketch_labels: ["ttp.download_execute", "attack.T1105"]
+    match_detection_names: ["download_execute_chain"]
 
   reverse_shell_or_tunnel_pattern:
     namespace: ttp
@@ -610,6 +614,7 @@ ttp_tags:
     evidence: "bash -i, /dev/tcp, mkfifo shell, socat pty, nc -e, ssh reverse tunnel, or equivalent."
     mitre: ["T1090", "T1095", "T1059.004"]
     timesketch_labels: ["ttp.reverse_shell", "attack.T1090"]
+    match_detection_names: ["reverse_shell_or_tunnel_pattern"]
 
   remote_access_tool_usage:
     namespace: ttp
@@ -618,6 +623,7 @@ ttp_tags:
     evidence: "AnyDesk, TeamViewer, LogMeIn, Atera, ScreenConnect, Splashtop, tmate, or similar present/executed."
     mitre: ["T1219"]
     timesketch_labels: ["ttp.remote_access_tool", "attack.T1219"]
+    match_tags: ["tool_category.remote_access", "tool_category.rmm"]
     source_refs: ["mitre_remote_access_tools"]
 
   rmm_tool_usage:
@@ -627,6 +633,7 @@ ttp_tags:
     evidence: "Remote monitoring/management agent observed on a host where it is not baselined."
     mitre: ["T1219"]
     timesketch_labels: ["ttp.rmm_tool", "attack.T1219"]
+    match_tags: ["tool_category.rmm"]
 
   exfil_tool_usage:
     namespace: ttp
@@ -635,6 +642,7 @@ ttp_tags:
     evidence: "rclone, MEGAcmd, cloud CLI sync/copy, scp/rsync to external destination, or equivalent."
     mitre: ["T1567", "T1567.002", "T1048", "T1105"]
     timesketch_labels: ["ttp.exfil_tool", "attack.T1567"]
+    match_detection_names: ["exfil_tool_usage"]
 
   cloud_storage_exfiltration:
     namespace: ttp
@@ -643,6 +651,7 @@ ttp_tags:
     evidence: "Cloud storage command or remote name used to move data off-host."
     mitre: ["T1567.002"]
     timesketch_labels: ["ttp.cloud_storage_exfil", "attack.T1567.002"]
+    match_detection_names: ["exfil_tool_usage"]
     source_refs: ["mitre_exfil_cloud_storage", "mitre_rclone"]
 
   archive_creation_candidate:
@@ -652,6 +661,7 @@ ttp_tags:
     evidence: "Archive utility targets sensitive directories or staging paths."
     mitre: ["T1560.001", "T1074.001"]
     timesketch_labels: ["ttp.archive_collected_data", "attack.T1560.001"]
+    match_detection_names: ["archive_creation_candidate"]
 
   data_staging:
     namespace: ttp
@@ -668,6 +678,7 @@ ttp_tags:
     evidence: "Access to /etc/shadow, SSH private keys, authorized_keys, cloud credentials, kube config, env secrets."
     mitre: ["T1552.001", "T1552.004", "T1552.005", "T1003.008"]
     timesketch_labels: ["ttp.credential_access", "attack.T1552"]
+    match_detection_names: ["credential_material_access", "plaintext_password_in_history"]
 
   cloud_metadata_access:
     namespace: ttp
@@ -676,6 +687,7 @@ ttp_tags:
     evidence: "Access to 169.254.169.254 or cloud metadata hostnames."
     mitre: ["T1552.005"]
     timesketch_labels: ["ttp.cloud_metadata", "attack.T1552.005"]
+    match_detection_names: ["cloud_metadata_access"]
 
   account_or_privilege_change:
     namespace: ttp
@@ -684,6 +696,7 @@ ttp_tags:
     evidence: "useradd, usermod, groupmod, gpasswd, sudo rule changes, passwd changes, account unlocks."
     mitre: ["T1136.001", "T1098", "T1548.003"]
     timesketch_labels: ["ttp.account_change", "ttp.privilege_change"]
+    match_detection_names: ["account_or_privilege_change", "password_set_command"]
 
   uid0_or_sudo_backdoor:
     namespace: ttp
@@ -709,6 +722,7 @@ ttp_tags:
     evidence: "Crontab or /etc/cron* additions executing scripts, network tools, miners, or temp-path payloads."
     mitre: ["T1053.003"]
     timesketch_labels: ["ttp.cron_persistence", "attack.T1053.003"]
+    match_detection_names: ["cron_modified"]
 
   systemd_persistence:
     namespace: ttp
@@ -717,6 +731,7 @@ ttp_tags:
     evidence: "New/modified systemd service, systemctl enable/start, suspicious ExecStart."
     mitre: ["T1543.002", "T1569.003"]
     timesketch_labels: ["ttp.systemd_persistence", "attack.T1543.002"]
+    match_detection_names: ["systemd_persistence_or_service_change"]
     source_refs: ["mitre_teamtnt"]
 
   persistence_service:
@@ -821,6 +836,7 @@ ttp_tags:
     evidence: "Execution or payload artifact under /tmp, /var/tmp, /dev/shm, /run."
     mitre: ["T1059.004", "T1036.005"]
     timesketch_labels: ["ttp.tmp_execution"]
+    match_detection_names: ["execution_or_artifact_from_tmp", "audit_exec_from_tmp"]
 
   log_or_history_tampering:
     namespace: ttp
@@ -829,6 +845,7 @@ ttp_tags:
     evidence: "history -c, truncation, deletion of auth/syslog/audit logs, or cleared command history."
     mitre: ["T1070.003", "T1070.004", "T1070.006"]
     timesketch_labels: ["ttp.log_tampering", "attack.T1070"]
+    match_detection_names: ["log_or_history_tampering"]
     source_refs: ["mitre_teamtnt"]
 
   security_tool_disable:
@@ -847,6 +864,7 @@ ttp_tags:
     evidence: "/var/run/docker.sock access, mounted Docker socket, docker API exposure."
     mitre: ["T1611", "T1609", "T1613"]
     timesketch_labels: ["ttp.docker_socket", "attack.T1611"]
+    match_detection_names: ["docker_socket_access"]
     source_refs: ["mitre_teamtnt"]
 
   container_escape_candidate:
@@ -864,6 +882,7 @@ ttp_tags:
     evidence: "Miner process/binary/config/pool connection or known miner names."
     mitre: ["T1496"]
     timesketch_labels: ["ttp.miner_execution", "attack.T1496"]
+    match_detection_names: ["miner_execution"]
     source_refs: ["mitre_resource_hijacking", "mitre_teamtnt"]
 
   ransomware_or_destructive_impact:
@@ -873,6 +892,7 @@ ttp_tags:
     evidence: "Ransom note, mass file rename/encryption pattern, ESXi/VM encryption command, service stop burst, shadow/backup destruction."
     mitre: ["T1486", "T1485", "T1490", "T1489"]
     timesketch_labels: ["ttp.ransomware_impact", "attack.T1486"]
+    match_detection_names: ["destructive_command"]
     source_refs: ["mitre_akira"]
 
   esxi_or_virtualization_targeting:
@@ -882,6 +902,7 @@ ttp_tags:
     evidence: "esxcli/vim-cmd usage, VM datastore targeting, .vmdk/.vmx encryption/search, hypervisor service manipulation."
     mitre: ["T1486", "T1569.003"]
     timesketch_labels: ["ttp.esxi_targeting", "tracequarry.virtualization"]
+    match_detection_names: ["esxi_or_vmware_admin_command"]
     source_refs: ["mitre_akira"]
 
   ftp_sftp_exfiltration:
@@ -956,6 +977,7 @@ ttp_tags:
     evidence: "masscan/nmap/zmap/zgrab or high-volume connection probing."
     mitre: ["T1046", "T1595.001", "T1595.002"]
     timesketch_labels: ["ttp.network_scanning", "attack.T1046"]
+    match_detection_names: ["network_scanner", "network_connectivity_test"]
 
   webshell_or_public_app_compromise_candidate:
     namespace: ttp
@@ -972,6 +994,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_teamtnt"]
     confidence_cap: medium
     required_evidence_count: 3
+    required_any_indicators: ["ttp.docker_socket_access", "ttp.container_escape_candidate", "ttp.cloud_metadata_access", "tool.tmate"]
     strong_indicators:
       - "ttp.docker_socket_access"
       - "ttp.container_escape_candidate"
@@ -996,6 +1019,7 @@ actor_similarity_profiles:
     actor_refs: []
     confidence_cap: medium
     required_evidence_count: 3
+    required_any_indicators: ["tool.xmrig"]
     strong_indicators:
       - "tool.xmrig"
       - "ttp.miner_execution"
@@ -1015,6 +1039,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_akira"]
     confidence_cap: medium
     required_evidence_count: 3
+    required_any_indicators: ["tool.anydesk", "ttp.esxi_or_virtualization_targeting"]
     strong_indicators:
       - "tool.rclone"
       - "tool.anydesk"
@@ -1036,6 +1061,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_rclone"]
     confidence_cap: low
     required_evidence_count: 4
+    required_any_indicators: ["tool.megacmd", "ttp.ransomware_or_destructive_impact"]
     strong_indicators:
       - "tool.rclone"
       - "tool.megacmd"
@@ -1056,6 +1082,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_remote_access_tools", "mitre_rclone"]
     confidence_cap: low
     required_evidence_count: 3
+    required_any_indicators: ["tool.anydesk", "tool.atera", "tool.connectwise_screenconnect", "tool.splashtop", "ttp.rmm_tool_usage"]
     strong_indicators:
       - "tool.anydesk"
       - "tool.atera"
@@ -1077,6 +1104,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_rclone"]
     confidence_cap: low
     required_evidence_count: 3
+    required_any_indicators: ["ttp.remote_access_tool_usage", "ttp.cloud_credential_access"]
     strong_indicators:
       - "ttp.valid_account_remote_access"
       - "tool.rclone"
@@ -1096,6 +1124,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_apt28"]
     confidence_cap: low
     required_evidence_count: 4
+    required_any_indicators: ["ttp.ssh_bruteforce", "ttp.network_scanning"]
     strong_indicators:
       - "ttp.ssh_bruteforce"
       - "ttp.valid_account_remote_access"
@@ -1114,6 +1143,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_apt29"]
     confidence_cap: low
     required_evidence_count: 4
+    required_any_indicators: ["ttp.cloud_credential_access", "ttp.cloud_metadata_access"]
     strong_indicators:
       - "ttp.cloud_credential_access"
       - "ttp.cloud_metadata_access"
@@ -1133,6 +1163,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_sandworm"]
     confidence_cap: low
     required_evidence_count: 3
+    required_any_indicators: ["ttp.ransomware_or_destructive_impact"]
     strong_indicators:
       - "ttp.ransomware_or_destructive_impact"
       - "ttp.security_tool_disable"
@@ -1150,6 +1181,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_lazarus"]
     confidence_cap: low
     required_evidence_count: 4
+    required_any_indicators: ["ttp.remote_access_tool_usage"]
     strong_indicators:
       - "ttp.credential_material_access"
       - "ttp.valid_account_remote_access"
@@ -1168,6 +1200,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_apt41"]
     confidence_cap: low
     required_evidence_count: 4
+    required_any_indicators: ["ttp.webshell_or_public_app_compromise_candidate"]
     strong_indicators:
       - "ttp.webshell_or_public_app_compromise_candidate"
       - "ttp.credential_material_access"
@@ -1186,6 +1219,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_remote_access_tools"]
     confidence_cap: low
     required_evidence_count: 3
+    required_any_indicators: ["tool.ngrok"]
     strong_indicators:
       - "tool.ngrok"
       - "ttp.remote_access_tool_usage"
@@ -1202,6 +1236,7 @@ actor_similarity_profiles:
     actor_refs: ["mitre_fin7", "mitre_remote_access_tools"]
     confidence_cap: low
     required_evidence_count: 3
+    required_any_indicators: ["tool.atera", "ttp.rmm_tool_usage"]
     strong_indicators:
       - "tool.atera"
       - "ttp.rmm_tool_usage"

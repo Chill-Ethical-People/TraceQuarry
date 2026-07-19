@@ -26,6 +26,21 @@ or third-party content that you do not have permission to share.
 - Keep test records synthetic and text-only. Use RFC 5737 documentation IPs,
   `.invalid` domains, and obvious credential placeholders.
 
+## Detection-Pack Contributions
+
+Tools, TTP mappings, malware/payload metadata, and actor-similarity profiles
+belong in the canonical `rules/tagging_registry.yml` detection pack. Follow the
+[rule-authoring guide](rules/README.md), add focused positive and false-positive
+tests, and run:
+
+```bash
+PYTHONPATH=. python3 -m uac_parser.rules_cli
+```
+
+Actor entries must remain profile similarity only. The validator rejects a
+`high` actor confidence cap, and submissions must not present shared tooling or
+ATT&CK overlap as attribution.
+
 ## Development Smoke Test
 
 Run the repository hygiene gate before testing:

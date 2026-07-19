@@ -5,7 +5,12 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Any
 
-from uac_parser.enrich.rule_registry import RegistryError, tool_rules
+from uac_parser.enrich.rule_registry import (
+    RegistryError,
+    actor_similarity_rules,
+    tool_rules,
+    ttp_rules,
+)
 from uac_parser.timeline.event import TimelineEvent
 
 TOOL_GROUPS = {
@@ -52,8 +57,10 @@ def _max_severity(a: str, b: str) -> str:
 def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
     try:
         registry_tools = tool_rules()
+        registry_ttps = ttp_rules()
     except RegistryError:
         registry_tools = {}
+        registry_ttps = {}
     for event in events:
         text = " ".join(
             filter(None, [event.command, event.file_path, event.summary, event.raw])
@@ -291,6 +298,7 @@ def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
         _apply_registry_tool_tags(
             event, text, execution_text, indicator_search, registry_tools
         )
+        _apply_registry_ttp_tags(event, registry_ttps)
     return events
 
 
@@ -333,6 +341,31 @@ def _apply_registry_tool_tags(
             action,
             severity,
             tags,
+            [str(value) for value in rule.get("mitre", [])],
+        )
+
+
+def _apply_registry_ttp_tags(
+    event: TimelineEvent, registry_ttps: dict[str, dict[str, Any]]
+) -> None:
+    detections = set(event.detection_names)
+    tags = set(event.tags)
+    for ttp_id, rule in registry_ttps.items():
+        match_detections = set(rule.get("match_detection_names", []))
+        match_actions = set(rule.get("match_event_actions", []))
+        match_tags = set(rule.get("match_tags", []))
+        if not (
+            detections & match_detections
+            or event.event_action in match_actions
+            or tags & match_tags
+        ):
+            continue
+        confidence = str(rule.get("confidence_when_matched", "medium"))
+        _add(
+            event,
+            ttp_id,
+            str(rule.get("severity", "medium")),
+            ["ttp", f"ttp.{ttp_id}", f"ttp_confidence.{confidence}"],
             [str(value) for value in rule.get("mitre", [])],
         )
 
@@ -844,51 +877,78 @@ def _account_lifecycle_findings(events: list[TimelineEvent]) -> list[dict[str, A
 
 
 def _actor_like_findings(events: list[TimelineEvent]) -> list[dict[str, Any]]:
-    observed = {event.event_action for event in events}
+    try:
+        profiles = actor_similarity_rules()
+    except RegistryError:
+        return []
+
+    evidence: dict[str, list[str]] = defaultdict(list)
     for event in events:
-        observed.update(event.detection_names)
-    profiles: dict[str, tuple[set[str], set[str]]] = {
-        "teamtnt_like_cloud_mining_tradecraft": (
-            {"miner_execution"},
-            {
-                "docker_socket_access",
-                "cloud_metadata_access",
-                "cron_modified",
-                "execution_or_artifact_from_tmp",
-            },
-        ),
-        "kinsing_like_linux_mining_tradecraft": (
-            {"miner_execution"},
-            {"cron_modified", "execution_or_artifact_from_tmp", "audit_exec_from_tmp"},
-        ),
-        "ransomware_extortion_like_tradecraft": (
-            {"destructive_command"},
-            {
-                "exfil_tool_usage",
-                "archive_creation_candidate",
-                "esxi_or_vmware_admin_command",
-            },
-        ),
-    }
-    findings = []
-    for name, (required, supporting) in profiles.items():
-        matched_required = sorted(required & observed)
+        signals = set(event.tags + event.detection_names + event.ttp_flags)
+        signals.add(event.event_action)
+        signals.update(f"ttp.{value}" for value in event.detection_names)
+        signals.update(f"ttp.{value}" for value in event.ttp_flags)
+        for signal in signals:
+            if event.event_id and event.event_id not in evidence[signal]:
+                evidence[signal].append(event.event_id)
+
+    observed = set(evidence)
+    findings: list[dict[str, Any]] = []
+    for profile_id, profile in profiles.items():
+        strong = set(profile.get("strong_indicators", []))
+        supporting = set(profile.get("supporting_indicators", []))
+        matched_strong = sorted(strong & observed)
         matched_supporting = sorted(supporting & observed)
-        if len(matched_required) == len(required) and matched_supporting:
-            matched = matched_required + matched_supporting
-            findings.append(
-                {
-                    "title": name.replace("_", " ").title(),
-                    "severity": "medium",
-                    "confidence": "low",
-                    "event_ids": [
-                        e.event_id
-                        for e in events
-                        if e.event_action in matched
-                        or set(e.detection_names) & set(matched)
-                    ][:10],
-                    "summary": "Tradecraft resembles a known Linux campaign cluster, but this is not attribution.",
-                    "tags": ["actor_relevant_ttp", "not_attribution"] + matched,
-                }
+        matched = matched_strong + matched_supporting
+        required_count = int(profile.get("required_evidence_count", 2))
+        required_any = set(profile.get("required_any_indicators", []))
+        minimum_strong = int(profile.get("minimum_strong_indicators", 2))
+        minimum_supporting = int(profile.get("minimum_supporting_indicators", 1))
+        if (
+            len(matched_strong) < minimum_strong
+            or len(matched_supporting) < minimum_supporting
+            or len(set(matched)) < required_count
+            or (required_any and not required_any & observed)
+        ):
+            continue
+
+        event_ids: list[str] = []
+        for indicator in matched:
+            for event_id in evidence[indicator]:
+                if event_id not in event_ids:
+                    event_ids.append(event_id)
+        minimum_event_count = int(profile.get("minimum_event_count", 2))
+        if len(event_ids) < minimum_event_count:
+            continue
+        warning = str(
+            profile.get(
+                "analyst_warning",
+                "Activity overlaps with this profile. This is not attribution.",
             )
+        )
+        findings.append(
+            {
+                "title": str(profile.get("display_name", profile_id)),
+                "severity": "medium",
+                "confidence": str(profile.get("confidence_cap", "low")),
+                "event_ids": event_ids[:15],
+                "summary": (
+                    f"Activity overlaps with the {profile_id} profile across "
+                    f"{len(set(matched))} indicators in {len(event_ids)} events. "
+                    f"This is not attribution. "
+                    f"{warning}"
+                ),
+                "tags": [
+                    "actor_relevant_ttp",
+                    "not_attribution",
+                    f"actor_similarity.{profile_id}",
+                    *matched,
+                ],
+                "profile_id": profile_id,
+                "matched_strong_indicators": matched_strong,
+                "matched_supporting_indicators": matched_supporting,
+                "mitre_focus": list(profile.get("mitre_focus", [])),
+                "source_refs": list(profile.get("actor_refs", [])),
+            }
+        )
     return findings

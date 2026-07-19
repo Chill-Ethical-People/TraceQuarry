@@ -52,5 +52,6 @@ jobs:
           cd "$RUNNER_TEMP"
           tracequarry --help
           tracequarry-web --help
-          python -c "from uac_parser.enrich.rule_registry import load_registry; assert load_registry()['metadata']['schema_version'] == '1.0'"
+          tracequarry-rules
+          python -c "from uac_parser.enrich.rule_registry import load_registry; assert load_registry()['metadata']['schema_version'] == '1.1'"
           python -c "from uac_parser.resources import resource_file; assert resource_file('assets', 'cep-mark.svg').is_file()"
