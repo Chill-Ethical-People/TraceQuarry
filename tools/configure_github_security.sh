@@ -17,10 +17,23 @@ gh api --method PUT "repos/$repo/branches/main/protection" --input - >/dev/null 
 {
   "required_status_checks": {
     "strict": true,
-    "contexts": ["Python 3.11", "Python 3.12"]
+    "contexts": [
+      "Python 3.11",
+      "Python 3.12",
+      "Open Source dependencies",
+      "Gitleaks history",
+      "analyze",
+      "dependency-review"
+    ]
   },
   "enforce_admins": false,
-  "required_pull_request_reviews": null,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": false,
+    "require_code_owner_reviews": false,
+    "required_approving_review_count": 0,
+    "require_last_push_approval": false,
+    "bypass_pull_request_allowances": {}
+  },
   "restrictions": null,
   "required_linear_history": true,
   "allow_force_pushes": false,
