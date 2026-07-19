@@ -1,8 +1,10 @@
 # TraceQuarry
 
 <p align="center">
-  <a href="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/ci.yml"><img src="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
-  <a href="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/codeql.yml"><img src="https://github.com/Chill-Ethical-People/tracequarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
+  <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/ci.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
+  <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml/badge.svg" alt="Snyk Open Source status"></a>
+  <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml/badge.svg" alt="Gitleaks secret scan status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-5C7F67.svg" alt="Apache-2.0 license"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
@@ -427,7 +429,7 @@ TraceQuarry supports Python 3.11 and 3.12. PyYAML is used to validate and load
 the external detection registry.
 
 ```bash
-git clone https://github.com/Chill-Ethical-People/tracequarry.git
+git clone https://github.com/Chill-Ethical-People/TraceQuarry.git
 cd tracequarry
 python3 -m venv .venv
 source .venv/bin/activate
@@ -469,6 +471,12 @@ scenarios. The automated suite covers:
 - Output traversal, Host, Origin, and CSRF security regressions
 - Public job-data redaction and restrictive evidence-file permissions
 - Oversized HTTP request rejection and parser error reporting
+
+CI also runs Snyk Open Source against the pinned production dependency baseline
+in `requirements.txt`. A scheduled weekly monitor checks that same baseline for
+newly disclosed vulnerabilities; the Snyk badge above reflects the workflow's
+latest result. Gitleaks scans the complete reachable Git history on pushes,
+pull requests, a weekly schedule, and manual release checks.
 
 These checks establish implementation confidence, not evidentiary conclusions.
 For case reporting, verify decisive findings against the raw source lines,
@@ -517,7 +525,7 @@ python3 -m pip install tracequarry-*.whl
 ```
 
 Security-sensitive issues should be reported privately through
-[GitHub Security Advisories](https://github.com/Chill-Ethical-People/tracequarry/security/advisories/new)
+[GitHub Security Advisories](https://github.com/Chill-Ethical-People/TraceQuarry/security/advisories/new)
 or by email to [`contact@chillethicalpeople.com`](mailto:contact@chillethicalpeople.com).
 
 Maintainers should complete the [public release checklist](docs/public-release-checklist.md)

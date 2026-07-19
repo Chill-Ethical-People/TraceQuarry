@@ -12,12 +12,15 @@ class TimelineEngineTests(unittest.TestCase):
             "event_action": "ssh_login_failure",
         }
         events = [
-            TimelineEvent(**common, user="root", src_ip="10.0.0.8", raw="failure port 41001"),
-            TimelineEvent(**common, user="root", src_ip="10.0.0.8", raw="failure port 41002"),
+            TimelineEvent(
+                **common, user="root", src_ip="10.0.0.8", raw="failure port 41001"
+            ),
+            TimelineEvent(
+                **common, user="root", src_ip="10.0.0.8", raw="failure port 41002"
+            ),
         ]
 
         self.assertEqual(len(dedupe_events(events)), 2)
-
 
     def test_dedupe_removes_exact_normalized_duplicate(self) -> None:
         event = TimelineEvent(
@@ -36,9 +39,11 @@ class TimelineEngineTests(unittest.TestCase):
             "event_action": "shadow_account_observed",
             "raw": "same normalized evidence",
         }
-        root, evilroot = assign_event_ids([
-            TimelineEvent(**common, user="root", extra={"uid": "0"}),
-            TimelineEvent(**common, user="evilroot", extra={"uid": "0"}),
-        ])
+        root, evilroot = assign_event_ids(
+            [
+                TimelineEvent(**common, user="root", extra={"uid": "0"}),
+                TimelineEvent(**common, user="evilroot", extra={"uid": "0"}),
+            ]
+        )
 
         self.assertNotEqual(root.event_id, evilroot.event_id)

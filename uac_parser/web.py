@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import cgi
-from datetime import datetime, timezone
-import html
 import hmac
+import html
 import json
 import mimetypes
 import os
@@ -15,22 +14,29 @@ import threading
 import time
 import traceback
 import uuid
+from datetime import UTC, datetime, tzinfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, cast
 from urllib.parse import parse_qs, unquote, urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from uac_parser import __version__
 from uac_parser.assist import profile_choices
 from uac_parser.enrich.iocs import parse_ioc_text
-from uac_parser.pipeline import inspect_time_range, run_case_pipeline, run_pipeline
+from uac_parser.pipeline import (
+    CasePipelineResult,
+    PipelineResult,
+    inspect_time_range,
+    run_case_pipeline,
+    run_pipeline,
+)
 from uac_parser.resources import resource_directory
 
-
-JOBS: dict[str, dict[str, object]] = {}
+JOBS: dict[str, dict[str, Any]] = {}
 JOBS_LOCK = threading.Lock()
 ANNOTATIONS_LOCK = threading.Lock()
-SERVER_CONFIG: dict[str, object] = {}
+SERVER_CONFIG: dict[str, Any] = {}
 CSRF_TOKEN = secrets.token_urlsafe(32)
 JOB_SLOTS: threading.BoundedSemaphore | None = None
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
@@ -47,13 +53,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
     parser.add_argument("--port", type=int, default=8765, help="Bind port")
-    parser.add_argument("--work-dir", default="web_runs", help="Directory for uploaded inputs and parser outputs")
+    parser.add_argument(
+        "--work-dir",
+        default="web_runs",
+        help="Directory for uploaded inputs and parser outputs",
+    )
     parser.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--max-upload-gib", type=float, default=8, help="Maximum HTTP upload size in GiB (default: 8)")
-    parser.add_argument("--max-work-dir-gib", type=float, default=40, help="Maximum work-directory size in GiB (default: 40)")
-    parser.add_argument("--max-concurrent-jobs", type=int, default=2, help="Maximum simultaneous inspect/parse jobs (default: 2)")
-    parser.add_argument("--request-timeout", type=float, default=120, help="Socket timeout per HTTP request in seconds (default: 120)")
-    parser.add_argument("--debug", action="store_true", help="Include detailed parser errors in local job responses")
+    parser.add_argument(
+        "--max-upload-gib",
+        type=float,
+        default=8,
+        help="Maximum HTTP upload size in GiB (default: 8)",
+    )
+    parser.add_argument(
+        "--max-work-dir-gib",
+        type=float,
+        default=40,
+        help="Maximum work-directory size in GiB (default: 40)",
+    )
+    parser.add_argument(
+        "--max-concurrent-jobs",
+        type=int,
+        default=2,
+        help="Maximum simultaneous inspect/parse jobs (default: 2)",
+    )
+    parser.add_argument(
+        "--request-timeout",
+        type=float,
+        default=120,
+        help="Socket timeout per HTTP request in seconds (default: 120)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Include detailed parser errors in local job responses",
+    )
     return parser
 
 
@@ -76,13 +110,15 @@ def main(argv: list[str] | None = None) -> int:
     _secure_directory(work_dir)
     _secure_directory(work_dir / "uploads")
     _secure_directory(work_dir / "outputs")
-    SERVER_CONFIG.update({
-        "work_dir": work_dir,
-        "max_request_bytes": int(args.max_upload_gib * 1024**3),
-        "max_work_bytes": int(args.max_work_dir_gib * 1024**3),
-        "request_timeout": args.request_timeout,
-        "debug": args.debug,
-    })
+    SERVER_CONFIG.update(
+        {
+            "work_dir": work_dir,
+            "max_request_bytes": int(args.max_upload_gib * 1024**3),
+            "max_work_bytes": int(args.max_work_dir_gib * 1024**3),
+            "request_timeout": args.request_timeout,
+            "debug": args.debug,
+        }
+    )
     JOB_SLOTS = threading.BoundedSemaphore(args.max_concurrent_jobs)
     server = HardenedThreadingHTTPServer((args.host, args.port), UacWebHandler)
     print(f"TraceQuarry GUI listening on http://{args.host}:{args.port}")
@@ -131,7 +167,11 @@ def _is_loopback_origin(origin: str, server_port: int) -> bool:
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
     except ValueError:
         return False
-    return parsed.scheme in {"http", "https"} and parsed.hostname in LOOPBACK_HOSTS and port == server_port
+    return (
+        parsed.scheme in {"http", "https"}
+        and parsed.hostname in LOOPBACK_HOSTS
+        and port == server_port
+    )
 
 
 def _acquire_job_slot() -> bool:
@@ -159,7 +199,9 @@ def _ensure_work_capacity(work_dir: Path, incoming_bytes: int) -> None:
     if _directory_size(work_dir) + incoming_bytes > max_work_bytes:
         raise ValueError("TraceQuarry work-directory quota would be exceeded.")
     if shutil.disk_usage(work_dir).free < incoming_bytes + MIN_FREE_BYTES:
-        raise ValueError("Insufficient free disk space for this request and the evidence safety reserve.")
+        raise ValueError(
+            "Insufficient free disk space for this request and the evidence safety reserve."
+        )
 
 
 def _public_error(exc: Exception) -> str:
@@ -180,28 +222,37 @@ class UacWebHandler(BaseHTTPRequestHandler):
         return self.server_version
 
     def end_headers(self) -> None:
-        self.send_header("Content-Security-Policy", (
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
-            "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
-        ))
+        self.send_header(
+            "Content-Security-Policy",
+            (
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
+                "base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+            ),
+        )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+        self.send_header(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        )
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
         super().end_headers()
 
     def _admit_request(self, *, state_changing: bool = False) -> bool:
-        if not _is_loopback_authority(self.headers.get("Host", ""), self.server.server_port):
+        server_port = cast(HardenedThreadingHTTPServer, self.server).server_port
+        if not _is_loopback_authority(self.headers.get("Host", ""), server_port):
             self._send_json({"error": "Untrusted Host header."}, status=421)
             return False
         if not state_changing:
             return True
         origin = self.headers.get("Origin", "").strip()
-        if origin and not _is_loopback_origin(origin, self.server.server_port):
-            self._send_json({"error": "Cross-origin requests are not permitted."}, status=403)
+        if origin and not _is_loopback_origin(origin, server_port):
+            self._send_json(
+                {"error": "Cross-origin requests are not permitted."}, status=403
+            )
             return False
         supplied = self.headers.get("X-TraceQuarry-CSRF", "")
         if not supplied or not hmac.compare_digest(supplied, CSRF_TOKEN):
@@ -219,7 +270,9 @@ class UacWebHandler(BaseHTTPRequestHandler):
         timeline_match = re.fullmatch(r"/api/job/([a-f0-9]{12})/timeline", parsed.path)
         if timeline_match:
             try:
-                self._send_json(_timeline_page(timeline_match.group(1), parse_qs(parsed.query)))
+                self._send_json(
+                    _timeline_page(timeline_match.group(1), parse_qs(parsed.query))
+                )
             except (ValueError, FileNotFoundError) as exc:
                 self._send_json({"error": str(exc)}, status=404)
             return
@@ -243,7 +296,9 @@ class UacWebHandler(BaseHTTPRequestHandler):
         if not self._admit_request(state_changing=True):
             return
         parsed = urlparse(self.path)
-        annotation_match = re.fullmatch(r"/api/job/([a-f0-9]{12})/annotations", parsed.path)
+        annotation_match = re.fullmatch(
+            r"/api/job/([a-f0-9]{12})/annotations", parsed.path
+        )
         if annotation_match:
             try:
                 payload = self._parse_json_body(max_bytes=16 * 1024)
@@ -259,7 +314,12 @@ class UacWebHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         if not _acquire_job_slot():
-            self._send_json({"error": "TraceQuarry is at its concurrent analysis limit. Try again shortly."}, status=429)
+            self._send_json(
+                {
+                    "error": "TraceQuarry is at its concurrent analysis limit. Try again shortly."
+                },
+                status=429,
+            )
             return
         slot_transferred = False
         try:
@@ -272,18 +332,27 @@ class UacWebHandler(BaseHTTPRequestHandler):
 
             input_paths = _input_paths_from_form(fields, uploaded_files, upload_dir)
             if not input_paths:
-                self._send_json({"error": "Choose a UAC archive/directory or provide a server-side input path."}, status=400)
+                self._send_json(
+                    {
+                        "error": "Choose a UAC archive/directory or provide a server-side input path."
+                    },
+                    status=400,
+                )
                 return
             timezone_name = fields.get("timezone", "UTC").strip() or "UTC"
             is_case = len(input_paths) > 1
 
-            options = {
+            options: dict[str, Any] = {
                 "input_path": input_paths[0],
                 "input_paths": input_paths,
                 "is_case": is_case,
                 "output_dir": str(output_dir),
-                "incident_start": _normalize_datetime_input(fields.get("incident_start", ""), timezone_name),
-                "incident_end": _normalize_datetime_input(fields.get("incident_end", ""), timezone_name),
+                "incident_start": _normalize_datetime_input(
+                    fields.get("incident_start", ""), timezone_name
+                ),
+                "incident_end": _normalize_datetime_input(
+                    fields.get("incident_end", ""), timezone_name
+                ),
                 "year": _parse_int(fields.get("year", "")),
                 "timezone_name": timezone_name,
                 "host": fields.get("host", "").strip(),
@@ -301,11 +370,15 @@ class UacWebHandler(BaseHTTPRequestHandler):
                     "is_case": is_case,
                     "output": str(output_dir),
                     "options": {
-                        key: value for key, value in options.items()
+                        key: value
+                        for key, value in options.items()
                         if key not in {"iocs"}
-                    } | {"ioc_count": len(options["iocs"])},
+                    }
+                    | {"ioc_count": len(options["iocs"])},
                 }
-            thread = threading.Thread(target=_run_job, args=(job_id, options), daemon=True)
+            thread = threading.Thread(
+                target=_run_job, args=(job_id, options), daemon=True
+            )
             thread.start()
             slot_transferred = True
             self._send_json({"job_id": job_id, "status_url": f"/api/job/{job_id}"})
@@ -322,20 +395,32 @@ class UacWebHandler(BaseHTTPRequestHandler):
         if not self._admit_request():
             return
         origin = self.headers.get("Origin", "").strip()
-        if origin and not _is_loopback_origin(origin, self.server.server_port):
-            self._send_json({"error": "Cross-origin requests are not permitted."}, status=403)
+        server_port = cast(HardenedThreadingHTTPServer, self.server).server_port
+        if origin and not _is_loopback_origin(origin, server_port):
+            self._send_json(
+                {"error": "Cross-origin requests are not permitted."}, status=403
+            )
             return
         self.send_response(204)
         self.send_header("Allow", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Origin", origin or f"http://127.0.0.1:{self.server.server_port}")
+        self.send_header(
+            "Access-Control-Allow-Origin", origin or f"http://127.0.0.1:{server_port}"
+        )
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-TraceQuarry-CSRF")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Content-Type, X-TraceQuarry-CSRF"
+        )
         self.send_header("Access-Control-Max-Age", "600")
         self.end_headers()
 
     def _handle_inspect(self) -> None:
         if not _acquire_job_slot():
-            self._send_json({"error": "TraceQuarry is at its concurrent analysis limit. Try again shortly."}, status=429)
+            self._send_json(
+                {
+                    "error": "TraceQuarry is at its concurrent analysis limit. Try again shortly."
+                },
+                status=429,
+            )
             return
         try:
             fields, uploaded_files = self._parse_form()
@@ -345,16 +430,29 @@ class UacWebHandler(BaseHTTPRequestHandler):
             _secure_directory(upload_dir)
             input_paths = _input_paths_from_form(fields, uploaded_files, upload_dir)
             if not input_paths:
-                self._send_json({"error": "Choose a UAC archive/directory or provide a server-side input path."}, status=400)
+                self._send_json(
+                    {
+                        "error": "Choose a UAC archive/directory or provide a server-side input path."
+                    },
+                    status=400,
+                )
                 return
             timezone_name = fields.get("timezone", "UTC").strip() or "UTC"
             result = _inspect_inputs(input_paths, fields, timezone_name)
             data = result
             data["timezone"] = timezone_name
-            data["earliest_local"] = _utc_iso_to_local_value(data.get("earliest"), timezone_name)
-            data["latest_local"] = _utc_iso_to_local_value(data.get("latest"), timezone_name)
-            data["earliest_display"] = _utc_iso_to_display(data.get("earliest"), timezone_name)
-            data["latest_display"] = _utc_iso_to_display(data.get("latest"), timezone_name)
+            data["earliest_local"] = _utc_iso_to_local_value(
+                data.get("earliest"), timezone_name
+            )
+            data["latest_local"] = _utc_iso_to_local_value(
+                data.get("latest"), timezone_name
+            )
+            data["earliest_display"] = _utc_iso_to_display(
+                data.get("earliest"), timezone_name
+            )
+            data["latest_display"] = _utc_iso_to_display(
+                data.get("latest"), timezone_name
+            )
             self._send_json(data)
         except ValueError as exc:
             status = 413 if "exceeds" in str(exc).lower() else 400
@@ -375,15 +473,19 @@ class UacWebHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as exc:
             raise ValueError("Invalid Content-Length header.") from exc
-        max_request_bytes = int(SERVER_CONFIG.get("max_request_bytes", DEFAULT_MAX_UPLOAD_BYTES))
+        max_request_bytes = int(
+            SERVER_CONFIG.get("max_request_bytes", DEFAULT_MAX_UPLOAD_BYTES)
+        )
         if length <= 0:
             raise ValueError("A non-empty request body is required.")
         if length > max_request_bytes:
-            raise ValueError(f"Request exceeds the {max_request_bytes / 1024**3:g} GiB local upload limit.")
+            raise ValueError(
+                f"Request exceeds the {max_request_bytes / 1024**3:g} GiB local upload limit."
+            )
         _ensure_work_capacity(_work_dir(), length)
         if content_type.startswith("multipart/form-data"):
             form = cgi.FieldStorage(
-                fp=self.rfile,
+                fp=cast(Any, self.rfile),
                 headers=self.headers,
                 environ={
                     "REQUEST_METHOD": "POST",
@@ -392,11 +494,13 @@ class UacWebHandler(BaseHTTPRequestHandler):
             )
             fields: dict[str, str] = {}
             uploaded_files: list[cgi.FieldStorage] = []
-            for key in form.keys():
+            for key in form:
                 item = form[key]
                 items = item if isinstance(item, list) else [item]
                 if key == "uac_file":
-                    uploaded_files.extend(upload for upload in items if getattr(upload, "filename", None))
+                    uploaded_files.extend(
+                        upload for upload in items if getattr(upload, "filename", None)
+                    )
                     continue
                 if items and getattr(items[0], "value", None) is not None:
                     fields[key] = str(items[0].value)
@@ -405,8 +509,10 @@ class UacWebHandler(BaseHTTPRequestHandler):
         parsed = parse_qs(body)
         return {key: values[0] if values else "" for key, values in parsed.items()}, []
 
-    def _parse_json_body(self, *, max_bytes: int) -> dict[str, object]:
-        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+    def _parse_json_body(self, *, max_bytes: int) -> dict[str, Any]:
+        content_type = (
+            self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        )
         if content_type != "application/json":
             raise ValueError("Annotation requests require application/json.")
         length = int(self.headers.get("Content-Length", "0"))
@@ -435,10 +541,16 @@ class UacWebHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
         target = (output_root / Path(*rest)).resolve()
-        if not target.is_relative_to(output_root) or not target.exists() or not target.is_file():
+        if (
+            not target.is_relative_to(output_root)
+            or not target.exists()
+            or not target.is_file()
+        ):
             self.send_error(404)
             return
-        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        content_type = (
+            mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        )
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(target.stat().st_size))
@@ -454,10 +566,16 @@ class UacWebHandler(BaseHTTPRequestHandler):
             return
         asset_root = resource_directory("assets").resolve()
         target = (asset_root / Path(*parts[1:])).resolve()
-        if not target.is_relative_to(asset_root) or not target.exists() or not target.is_file():
+        if (
+            not target.is_relative_to(asset_root)
+            or not target.exists()
+            or not target.is_file()
+        ):
             self.send_error(404)
             return
-        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        content_type = (
+            mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        )
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(target.stat().st_size))
@@ -487,10 +605,13 @@ class UacWebHandler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
 
-def _run_job(job_id: str, options: dict[str, object]) -> None:
-    _update_job(job_id, status="running", stage="parsing", progress=18, started_at=time.time())
+def _run_job(job_id: str, options: dict[str, Any]) -> None:
+    _update_job(
+        job_id, status="running", stage="parsing", progress=18, started_at=time.time()
+    )
     try:
-        def report_progress(payload: dict[str, object]) -> None:
+
+        def report_progress(payload: dict[str, Any]) -> None:
             total = max(1, int(payload.get("total") or 1))
             completed = int(payload.get("completed") or 0)
             collection_total = max(1, int(payload.get("collection_total") or 1))
@@ -503,6 +624,7 @@ def _run_job(job_id: str, options: dict[str, object]) -> None:
                 progress_detail=payload,
             )
 
+        result: CasePipelineResult | PipelineResult
         if options.get("is_case"):
             result = run_case_pipeline(
                 list(options["input_paths"]),
@@ -549,7 +671,11 @@ def _run_job(job_id: str, options: dict[str, object]) -> None:
             progress=100,
             completed_at=time.time(),
             error=str(exc),
-            **({"traceback": traceback.format_exc()} if SERVER_CONFIG.get("debug") else {}),
+            **(
+                {"traceback": traceback.format_exc()}
+                if SERVER_CONFIG.get("debug")
+                else {}
+            ),
         )
     finally:
         _release_job_slot()
@@ -558,13 +684,18 @@ def _run_job(job_id: str, options: dict[str, object]) -> None:
 def _save_upload(uploaded_file: cgi.FieldStorage, upload_dir: Path) -> Path:
     filename = Path(uploaded_file.filename or "uac-upload.tar.gz").name
     target = upload_dir / filename
+    source = uploaded_file.file
+    if source is None:
+        raise ValueError("Uploaded evidence file has no readable content.")
     with target.open("wb") as handle:
-        shutil.copyfileobj(uploaded_file.file, handle)
+        shutil.copyfileobj(source, handle)
     target.chmod(0o600)
     return target
 
 
-def _input_paths_from_form(fields: dict[str, str], uploaded_files: list[cgi.FieldStorage], upload_dir: Path) -> list[str]:
+def _input_paths_from_form(
+    fields: dict[str, str], uploaded_files: list[cgi.FieldStorage], upload_dir: Path
+) -> list[str]:
     input_paths = []
     for raw_line in fields.get("input_path", "").splitlines():
         line = raw_line.strip()
@@ -582,7 +713,9 @@ def _input_paths_from_form(fields: dict[str, str], uploaded_files: list[cgi.Fiel
     return unique_paths
 
 
-def _inspect_inputs(input_paths: list[str], fields: dict[str, str], timezone_name: str) -> dict[str, object]:
+def _inspect_inputs(
+    input_paths: list[str], fields: dict[str, str], timezone_name: str
+) -> dict[str, Any]:
     results = [
         inspect_time_range(
             input_path,
@@ -592,8 +725,16 @@ def _inspect_inputs(input_paths: list[str], fields: dict[str, str], timezone_nam
         )
         for input_path in input_paths
     ]
-    earliest_result = min((result for result in results if result.earliest), key=lambda result: result.earliest or "9999", default=None)
-    latest_result = max((result for result in results if result.latest), key=lambda result: result.latest or "", default=None)
+    earliest_result = min(
+        (result for result in results if result.earliest),
+        key=lambda result: result.earliest or "9999",
+        default=None,
+    )
+    latest_result = max(
+        (result for result in results if result.latest),
+        key=lambda result: result.latest or "",
+        default=None,
+    )
     log_events = sum(result.log_events for result in results)
     timed_events = sum(result.timed_events for result in results)
     return {
@@ -608,13 +749,18 @@ def _inspect_inputs(input_paths: list[str], fields: dict[str, str], timezone_nam
         "earliest_source": earliest_result.earliest_source if earliest_result else "",
         "latest_source": latest_result.latest_source if latest_result else "",
         "range_basis": "log_time" if log_events else "timestamped_evidence",
-        "source_types": sorted({kind for result in results for kind in result.source_types}),
+        "source_types": sorted(
+            {kind for result in results for kind in result.source_types}
+        ),
         "collections": len(input_paths),
-        "collection_ranges": [result.to_dict() | {"input": input_paths[index]} for index, result in enumerate(results)],
+        "collection_ranges": [
+            result.to_dict() | {"input": input_paths[index]}
+            for index, result in enumerate(results)
+        ],
     }
 
 
-def _list_outputs(output_dir: Path, job_id: str) -> list[dict[str, object]]:
+def _list_outputs(output_dir: Path, job_id: str) -> list[dict[str, Any]]:
     preferred = [
         "case_summary.md",
         "case_assisted_investigation.md",
@@ -649,20 +795,24 @@ def _list_outputs(output_dir: Path, job_id: str) -> list[dict[str, object]]:
     for name in preferred:
         path = output_dir / name
         if path.exists():
-            files.append({
-                "name": name,
-                "size": path.stat().st_size,
-                "url": f"/outputs/{job_id}/{name}",
-            })
+            files.append(
+                {
+                    "name": name,
+                    "size": path.stat().st_size,
+                    "url": f"/outputs/{job_id}/{name}",
+                }
+            )
     hosts_dir = output_dir / "hosts"
     if hosts_dir.exists():
         for summary in sorted(hosts_dir.glob("*/summary.md")):
             rel = summary.relative_to(output_dir)
-            files.append({
-                "name": str(rel),
-                "size": summary.stat().st_size,
-                "url": f"/outputs/{job_id}/{rel.as_posix()}",
-            })
+            files.append(
+                {
+                    "name": str(rel),
+                    "size": summary.stat().st_size,
+                    "url": f"/outputs/{job_id}/{rel.as_posix()}",
+                }
+            )
     return files
 
 
@@ -682,11 +832,13 @@ def _timeline_file(output_dir: Path, scope: str) -> tuple[Path, str]:
     requested = "full" if scope == "full" else "mini"
     candidates = (
         [("case_timeline_mini.jsonl", "mini"), ("case_timeline_full.jsonl", "full")]
-        if requested == "mini" else [("case_timeline_full.jsonl", "full")]
+        if requested == "mini"
+        else [("case_timeline_full.jsonl", "full")]
     )
     candidates += (
         [("timeline_mini.jsonl", "mini"), ("timeline_full.jsonl", "full")]
-        if requested == "mini" else [("timeline_full.jsonl", "full")]
+        if requested == "mini"
+        else [("timeline_full.jsonl", "full")]
     )
     for name, actual_scope in candidates:
         path = output_dir / name
@@ -695,7 +847,7 @@ def _timeline_file(output_dir: Path, scope: str) -> tuple[Path, str]:
     raise FileNotFoundError("Timeline output is unavailable for this job.")
 
 
-def _timeline_page(job_id: str, query: dict[str, list[str]]) -> dict[str, object]:
+def _timeline_page(job_id: str, query: dict[str, list[str]]) -> dict[str, Any]:
     output_dir = _job_output_dir(job_id)
     scope = _query_value(query, "scope", "mini")
     path, actual_scope = _timeline_file(output_dir, scope)
@@ -705,7 +857,7 @@ def _timeline_page(job_id: str, query: dict[str, list[str]]) -> dict[str, object
     offset = max(0, _query_int(query, "offset", 0))
     limit = min(200, max(20, _query_int(query, "limit", 80)))
     annotations = _load_annotations(output_dir).get("annotations", {})
-    items: list[dict[str, object]] = []
+    items: list[dict[str, Any]] = []
     total = 0
     severity_counts: dict[str, int] = {}
     source_counts: dict[str, int] = {}
@@ -745,7 +897,7 @@ def _timeline_page(job_id: str, query: dict[str, list[str]]) -> dict[str, object
     }
 
 
-def _save_annotation(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+def _save_annotation(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     output_dir = _job_output_dir(job_id)
     event_id = str(payload.get("event_id") or "").strip()
     if not re.fullmatch(r"evt_[A-Za-z0-9]+|evt-[A-Za-z0-9_.-]+", event_id):
@@ -763,10 +915,16 @@ def _save_annotation(job_id: str, payload: dict[str, object]) -> dict[str, objec
             tags.append(tag)
     note = str(payload.get("note") or "").strip()[:2000]
     disposition = str(payload.get("disposition") or "unreviewed").strip().lower()
-    allowed_dispositions = {"unreviewed", "suspicious", "malicious", "benign", "needs_context"}
+    allowed_dispositions = {
+        "unreviewed",
+        "suspicious",
+        "malicious",
+        "benign",
+        "needs_context",
+    }
     if disposition not in allowed_dispositions:
         raise ValueError("Unsupported analyst disposition.")
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     with ANNOTATIONS_LOCK:
         document = _load_annotations(output_dir)
         annotations = document.setdefault("annotations", {})
@@ -782,15 +940,21 @@ def _save_annotation(job_id: str, payload: dict[str, object]) -> dict[str, objec
         document["updated_at"] = now
         target = output_dir / "analyst_annotations.json"
         temporary = output_dir / ".analyst_annotations.json.tmp"
-        temporary.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         temporary.chmod(0o600)
         temporary.replace(target)
         target.chmod(0o600)
     _update_job(job_id, outputs=_list_outputs(output_dir, job_id))
-    return {"event_id": event_id, "annotation": annotations.get(event_id, {}), "saved": True}
+    return {
+        "event_id": event_id,
+        "annotation": annotations.get(event_id, {}),
+        "saved": True,
+    }
 
 
-def _load_annotations(output_dir: Path) -> dict[str, object]:
+def _load_annotations(output_dir: Path) -> dict[str, Any]:
     path = output_dir / "analyst_annotations.json"
     if not path.exists():
         return {"schema_version": "1.0", "updated_at": "", "annotations": {}}
@@ -810,11 +974,28 @@ def _event_exists(output_dir: Path, event_id: str) -> bool:
         return any(needle in line for line in handle)
 
 
-def _searchable_event_text(event: dict[str, object]) -> str:
+def _searchable_event_text(event: dict[str, Any]) -> str:
     fields = [
-        "timestamp", "host", "collection_host", "collection_name", "source_path", "source_type",
-        "event_category", "event_action", "user", "src_ip", "dst_ip", "process", "command",
-        "file_path", "summary", "raw", "severity", "tags", "mitre", "detection_names",
+        "timestamp",
+        "host",
+        "collection_host",
+        "collection_name",
+        "source_path",
+        "source_type",
+        "event_category",
+        "event_action",
+        "user",
+        "src_ip",
+        "dst_ip",
+        "process",
+        "command",
+        "file_path",
+        "summary",
+        "raw",
+        "severity",
+        "tags",
+        "mitre",
+        "detection_names",
     ]
     return " ".join(str(event.get(field) or "").lower() for field in fields)
 
@@ -831,7 +1012,7 @@ def _query_int(query: dict[str, list[str]], key: str, default: int) -> int:
         return default
 
 
-def get_job(job_id: str) -> dict[str, object]:
+def get_job(job_id: str) -> dict[str, Any]:
     with JOBS_LOCK:
         job = dict(JOBS.get(job_id, {}))
     if not job:
@@ -839,22 +1020,37 @@ def get_job(job_id: str) -> dict[str, object]:
     public = {
         key: job[key]
         for key in [
-            "id", "status", "created_at", "is_case", "stage", "progress", "started_at",
-            "progress_detail", "completed_at", "outputs",
+            "id",
+            "status",
+            "created_at",
+            "is_case",
+            "stage",
+            "progress",
+            "started_at",
+            "progress_detail",
+            "completed_at",
+            "outputs",
         ]
         if key in job
     }
     options = job.get("options")
     if isinstance(options, dict):
         public["options"] = {
-            key: value for key, value in options.items()
+            key: value
+            for key, value in options.items()
             if key not in {"input_path", "input_paths", "output_dir"}
         }
     result = job.get("result")
     if isinstance(result, dict):
-        public["result"] = {key: value for key, value in result.items() if key != "output"}
+        public["result"] = {
+            key: value for key, value in result.items() if key != "output"
+        }
     if job.get("error"):
-        public["error"] = str(job["error"]) if SERVER_CONFIG.get("debug") else "Analysis failed. Review the local server log."
+        public["error"] = (
+            str(job["error"])
+            if SERVER_CONFIG.get("debug")
+            else "Analysis failed. Review the local server log."
+        )
     if SERVER_CONFIG.get("debug") and job.get("traceback"):
         public["traceback"] = job["traceback"]
     return public
@@ -882,9 +1078,9 @@ def _normalize_datetime_input(value: str | None, timezone_name: str) -> str | No
     except ValueError:
         return text
     try:
-        tz = ZoneInfo(timezone_name)
+        tz: tzinfo = ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError:
-        tz = timezone.utc
+        tz = UTC
     return dt.replace(tzinfo=tz).isoformat()
 
 
@@ -906,9 +1102,9 @@ def _utc_iso_to_datetime(value: str | None, timezone_name: str) -> datetime | No
     except ValueError:
         return None
     try:
-        tz = ZoneInfo(timezone_name)
+        tz: tzinfo = ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError:
-        tz = timezone.utc
+        tz = UTC
     return dt.astimezone(tz)
 
 
@@ -939,7 +1135,9 @@ def render_index(csrf_token: str = CSRF_TOKEN) -> str:
         f'              <option value="{html.escape(profile["id"])}">{html.escape(profile["label"])}</option>'
         for profile in threat_profiles
     )
-    threat_profiles_json = json.dumps(threat_profiles, ensure_ascii=True).replace("</", "<\\/")
+    threat_profiles_json = json.dumps(threat_profiles, ensure_ascii=True).replace(
+        "</", "<\\/"
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>

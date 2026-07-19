@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sysconfig
+from pathlib import Path
 
 
 def resource_directories(kind: str) -> tuple[Path, ...]:

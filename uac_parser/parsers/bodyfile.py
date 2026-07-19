@@ -34,27 +34,28 @@ def parse(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
             timestamp = parse_epoch(value)
             if not timestamp:
                 continue
-            events.append(TimelineEvent(
-                timestamp=timestamp,
-                timestamp_raw=value,
-                timezone="UTC",
-                timezone_confidence="source_epoch",
-                timestamp_type=ts_type,
-                host=host,
-                source_path=relative,
-                source_type="bodyfile",
-                parser="bodyfile",
-                event_category="filesystem",
-                event_action=action,
-                uid=meta["uid"],
-                gid=meta["gid"],
-                file_path=name,
-                severity="informational",
-                confidence="medium",
-                tags=["bodyfile", "filesystem", ts_type],
-                summary=f"{action.replace('_', ' ').title()}: {name}",
-                raw=raw,
-                extra=meta,
-            ))
+            events.append(
+                TimelineEvent(
+                    timestamp=timestamp,
+                    timestamp_raw=value,
+                    timezone="UTC",
+                    timezone_confidence="source_epoch",
+                    timestamp_type=ts_type,
+                    host=host,
+                    source_path=relative,
+                    source_type="bodyfile",
+                    parser="bodyfile",
+                    event_category="filesystem",
+                    event_action=action,
+                    uid=meta["uid"],
+                    gid=meta["gid"],
+                    file_path=name,
+                    severity="informational",
+                    confidence="medium",
+                    tags=["bodyfile", "filesystem", ts_type],
+                    summary=f"{action.replace('_', ' ').title()}: {name}",
+                    raw=raw,
+                    extra=meta,
+                )
+            )
     return events
-

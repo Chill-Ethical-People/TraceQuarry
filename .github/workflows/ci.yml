@@ -18,8 +18,8 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -30,9 +30,17 @@ jobs:
       - name: Reject evidence and workstation metadata
         run: python tools/check_repository_hygiene.py
       - name: Check Python quality
-        run: ruff check uac_parser tests tools
+        run: |
+          ruff check uac_parser tests tools
+          ruff format --check uac_parser tests tools
+          mypy uac_parser
+          bandit -q -c pyproject.toml -r uac_parser
       - name: Run regression suite
-        run: python -m unittest discover -s tests -v
+        run: |
+          coverage run -m unittest discover -s tests -v
+          coverage report
+      - name: Audit Python dependencies
+        run: pip-audit . --strict --progress-spinner off
       - name: Build distributions
         run: python -m build
       - name: Validate distribution metadata

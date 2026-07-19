@@ -5,6 +5,30 @@ All notable TraceQuarry changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Enforced Ruff formatting and linting, strict MyPy checks, Bandit scanning,
+  dependency auditing, and a 65% coverage floor in CI and release workflows.
+- Added Snyk Open Source CI testing, scheduled monitoring, and a dependency
+  manifest consistency regression.
+- Added verified full-history Gitleaks scanning and immutable commit pins for
+  every GitHub Action used by CI and release workflows.
+- Regression coverage for tar traversal and archive-link handling.
+
+### Changed
+
+- Replaced archive extraction APIs with explicit regular-file streaming and
+  canonical destination checks for tar and ZIP inputs.
+- Replaced SHA-1 event and collection identifiers with SHA-256 identifiers.
+- Added complete function annotations across the parser and web workbench.
+
+### Security
+
+- Archive links and non-regular tar members are no longer materialized.
+- Repository hygiene rejects cloud-sync duplicate sidecars before release.
+- Project dependency auditing and Snyk Open Source report no known
+  vulnerabilities.
+
 ## [0.4.0-beta.1] - 2026-07-18
 
 ### Added
@@ -38,7 +62,7 @@ All notable TraceQuarry changes are documented here. The project follows
 - Multi-collection case workspaces and cross-host correlation.
 - Assisted investigation profiles and interactive timeline review.
 
-[Unreleased]: https://github.com/Chill-Ethical-People/tracequarry/compare/v0.4.0-beta.1...HEAD
-[0.4.0-beta.1]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.4.0-beta.1
-[0.3.1]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.3.1
-[0.3.0]: https://github.com/Chill-Ethical-People/tracequarry/releases/tag/v0.3.0
+[Unreleased]: https://github.com/Chill-Ethical-People/TraceQuarry/compare/v0.4.0-beta.1...HEAD
+[0.4.0-beta.1]: https://github.com/Chill-Ethical-People/TraceQuarry/releases/tag/v0.4.0-beta.1
+[0.3.1]: https://github.com/Chill-Ethical-People/TraceQuarry/releases/tag/v0.3.1
+[0.3.0]: https://github.com/Chill-Ethical-People/TraceQuarry/releases/tag/v0.3.0

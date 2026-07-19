@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 from uac_parser.timeline.event import TimelineEvent
 from uac_parser.timeline.timestamp import parse_syslog
 
 from .common import read_text_lines
 
-
-PROC_RE = re.compile(r"^\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+(?P<host>\S+)\s+(?P<proc>[\w./-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<msg>.*)$")
-SSH_SUCCESS_RE = re.compile(r"Accepted (?P<method>\S+) for (?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)")
-SSH_FAIL_RE = re.compile(r"Failed \S+ for (?:invalid user )?(?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)")
-SUDO_RE = re.compile(r"(?P<user>\S+)\s*:\s*(?:TTY=(?P<tty>[^;]+)\s*;\s*)?PWD=(?P<pwd>[^;]+)\s*;\s*USER=(?P<runas>[^;]+)\s*;\s*COMMAND=(?P<command>.*)")
+PROC_RE = re.compile(
+    r"^\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+(?P<host>\S+)\s+(?P<proc>[\w./-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<msg>.*)$"
+)
+SSH_SUCCESS_RE = re.compile(
+    r"Accepted (?P<method>\S+) for (?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)"
+)
+SSH_FAIL_RE = re.compile(
+    r"Failed \S+ for (?:invalid user )?(?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)"
+)
+SUDO_RE = re.compile(
+    r"(?P<user>\S+)\s*:\s*(?:TTY=(?P<tty>[^;]+)\s*;\s*)?PWD=(?P<pwd>[^;]+)\s*;\s*USER=(?P<runas>[^;]+)\s*;\s*COMMAND=(?P<command>.*)"
+)
 SU_RE = re.compile(r"session opened for user (?P<user>\S+)")
 PASSWD_CHANGE_RE = re.compile(r"password changed for (?P<user>\S+)")
 USERADD_RE = re.compile(
@@ -27,11 +34,21 @@ USERDEL_RE = re.compile(r"delete user '(?P<user>\S+?)'")
 USERMOD_RE = re.compile(r"change user '(?P<user>\S+?)'")
 GROUP_MEMBER_RE = re.compile(r"members of '(?P<group>\S+?)': (?P<members>.*)")
 ACCT_LOCK_RE = re.compile(r"user (?P<user>\S+) account (?P<action>locked|unlocked)")
-SSH_DISCONNECT_RE = re.compile(r"Disconnected from (?:authenticating\s+)?user (?P<user>\S+) (?P<src_ip>\S+) port (?P<port>\d+)")
-INVALID_USER_RE = re.compile(r"Invalid user (?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)")
+SSH_DISCONNECT_RE = re.compile(
+    r"Disconnected from (?:authenticating\s+)?user (?P<user>\S+) (?P<src_ip>\S+) port (?P<port>\d+)"
+)
+INVALID_USER_RE = re.compile(
+    r"Invalid user (?P<user>\S+) from (?P<src_ip>\S+) port (?P<port>\d+)"
+)
 
 
-def parse(path: Path, relative: str, host: str = "", year: int | None = None, timezone_name: str = "UTC") -> list[TimelineEvent]:
+def parse(
+    path: Path,
+    relative: str,
+    host: str = "",
+    year: int | None = None,
+    timezone_name: str = "UTC",
+) -> list[TimelineEvent]:
     events: list[TimelineEvent] = []
     for raw in read_text_lines(path):
         timestamp = parse_syslog(raw, year=year, timezone_name=timezone_name)
@@ -67,7 +84,9 @@ def parse(path: Path, relative: str, host: str = "", year: int | None = None, ti
                 event.severity = "medium"
                 event.confidence = "high"
                 event.tags = ["ssh", "remote_access", "valid_account"]
-                event.summary = f"Successful SSH login for {event.user} from {event.src_ip}"
+                event.summary = (
+                    f"Successful SSH login for {event.user} from {event.src_ip}"
+                )
                 events.append(event)
                 continue
         if "Failed " in msg and " from " in msg:
@@ -160,7 +179,9 @@ def parse(path: Path, relative: str, host: str = "", year: int | None = None, ti
                 event.tags = ["account_management", "group_created"]
                 event.detection_names = ["auth_group_created"]
                 event.ttp_flags = ["auth_group_created"]
-                event.summary = f"New group created: {gm.group('group')} gid={event.gid or '?'}"
+                event.summary = (
+                    f"New group created: {gm.group('group')} gid={event.gid or '?'}"
+                )
                 event.extra = {"group": gm.group("group")}
                 events.append(event)
                 continue

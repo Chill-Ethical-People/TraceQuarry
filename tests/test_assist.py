@@ -1,6 +1,6 @@
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from uac_parser.assist import (
     InvestigationProfileError,
@@ -34,14 +34,16 @@ class AssistedInvestigationTests(unittest.TestCase):
             detection_names=["exfil_tool_usage"],
             mitre=["T1567"],
         )
-        findings = [{
-            "title": "Exfil Tool Usage",
-            "severity": "high",
-            "confidence": "high",
-            "summary": "Observed rclone execution.",
-            "event_ids": ["evt-1"],
-            "tags": ["exfil_tool_usage"],
-        }]
+        findings = [
+            {
+                "title": "Exfil Tool Usage",
+                "severity": "high",
+                "confidence": "high",
+                "summary": "Observed rclone execution.",
+                "event_ids": ["evt-1"],
+                "tags": ["exfil_tool_usage"],
+            }
+        ]
 
         report = build_assisted_investigation(
             "ransomware_extortion", [event], findings, {"shell_history", "ss_output"}
@@ -49,7 +51,9 @@ class AssistedInvestigationTests(unittest.TestCase):
 
         self.assertEqual(report["profile_id"], "ransomware_extortion")
         self.assertEqual(report["prioritized_findings"][0]["relevance"], "primary")
-        self.assertTrue(any(item["status"] == "observed" for item in report["checklist"]))
+        self.assertTrue(
+            any(item["status"] == "observed" for item in report["checklist"])
+        )
         with tempfile.TemporaryDirectory() as directory:
             write_assisted_investigation(Path(directory), report)
             self.assertTrue((Path(directory) / "assisted_investigation.md").exists())

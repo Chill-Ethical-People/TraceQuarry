@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta, timezone
 import unittest
+from datetime import UTC, datetime, timedelta
 
 from uac_parser.enrich.ttp_rules import derive_findings
 from uac_parser.parsers.auth import parse as parse_auth
@@ -38,16 +38,27 @@ class FindingTests(unittest.TestCase):
         self.assertEqual(events[0].extra["shell"], "/bin/bash")
 
     def test_success_after_failures_uses_bounded_window(self) -> None:
-        success = datetime(2026, 6, 16, 10, 0, tzinfo=timezone.utc)
-        old_failures = [_ssh("ssh_login_failure", success - timedelta(hours=2, minutes=index)) for index in range(6)]
-        recent_failures = [_ssh("ssh_login_failure", success - timedelta(minutes=index + 1)) for index in range(5)]
+        success = datetime(2026, 6, 16, 10, 0, tzinfo=UTC)
+        old_failures = [
+            _ssh("ssh_login_failure", success - timedelta(hours=2, minutes=index))
+            for index in range(6)
+        ]
+        recent_failures = [
+            _ssh("ssh_login_failure", success - timedelta(minutes=index + 1))
+            for index in range(5)
+        ]
 
-        findings = derive_findings(old_failures + recent_failures + [_ssh("ssh_login_success", success)])
-        finding = next(item for item in findings if item["title"] == "Successful SSH login after repeated failures")
+        findings = derive_findings(
+            old_failures + recent_failures + [_ssh("ssh_login_success", success)]
+        )
+        finding = next(
+            item
+            for item in findings
+            if item["title"] == "Successful SSH login after repeated failures"
+        )
 
         self.assertIn("after 5 failed attempts", finding["summary"])
         self.assertEqual(finding["evidence_window_seconds"], 1800)
-
 
     def test_lateral_negative_is_inconclusive_when_sources_missing(self) -> None:
         findings = derive_findings([], available_source_types={"auth_log"})
@@ -55,7 +66,6 @@ class FindingTests(unittest.TestCase):
 
         self.assertIn("coverage_gap", finding["tags"])
         self.assertEqual(finding["confidence"], "low")
-
 
     def test_lateral_negative_requires_relevant_coverage(self) -> None:
         findings = derive_findings(
@@ -78,8 +88,15 @@ class FindingTests(unittest.TestCase):
             available_source_types={"shell_history", "ss_output", "known_hosts"},
         )
 
-        self.assertTrue(any(item["title"] == "Known SSH Destination Observed" for item in findings))
-        self.assertFalse(any(item["title"] == "Outbound Lateral Movement Evidence" for item in findings))
+        self.assertTrue(
+            any(item["title"] == "Known SSH Destination Observed" for item in findings)
+        )
+        self.assertFalse(
+            any(
+                item["title"] == "Outbound Lateral Movement Evidence"
+                for item in findings
+            )
+        )
 
     def test_suid_inventory_is_medium_severity(self) -> None:
         event = TimelineEvent(
@@ -90,7 +107,8 @@ class FindingTests(unittest.TestCase):
         )
 
         finding = next(
-            item for item in derive_findings([event])
+            item
+            for item in derive_findings([event])
             if item["title"] == "Suid File Observed"
         )
         self.assertEqual(finding["severity"], "medium")

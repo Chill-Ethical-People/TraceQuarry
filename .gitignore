@@ -1,11 +1,14 @@
 # Local OS/editor noise
 .DS_Store
+* 2
 
 # Python runtime/cache artifacts
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 build/

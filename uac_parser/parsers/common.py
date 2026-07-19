@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 
 def read_text_lines(path: Path) -> Iterable[str]:
@@ -16,4 +16,3 @@ def basename_host_from_source(relative: str) -> str:
         if part in {"hostname", "uname"} and idx + 1 < len(parts):
             return parts[idx + 1]
     return ""
-

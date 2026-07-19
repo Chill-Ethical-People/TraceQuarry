@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 import binascii
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -10,8 +10,9 @@ from uac_parser.timeline.timestamp import parse_epoch
 
 from .common import read_text_lines
 
-
-AUDIT_RE = re.compile(r"type=(?P<type>\w+)\s+msg=audit\((?P<epoch>\d+\.\d+):(?P<id>\d+)\):\s*(?P<body>.*)")
+AUDIT_RE = re.compile(
+    r"type=(?P<type>\w+)\s+msg=audit\((?P<epoch>\d+\.\d+):(?P<id>\d+)\):\s*(?P<body>.*)"
+)
 KV_RE = re.compile(r"(\w+)=(\"[^\"]*\"|\S+)")
 
 
@@ -27,7 +28,12 @@ def _decode_audit_value(value: str | None) -> str | None:
         return value
     if re.fullmatch(r"[0-9A-Fa-f]+", value) and len(value) % 2 == 0:
         try:
-            decoded = binascii.unhexlify(value).replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+            decoded = (
+                binascii.unhexlify(value)
+                .replace(b"\x00", b" ")
+                .decode("utf-8", "replace")
+                .strip()
+            )
             if decoded:
                 return decoded
         except (binascii.Error, ValueError):
@@ -41,7 +47,9 @@ def parse(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
         match = AUDIT_RE.search(raw)
         if not match:
             continue
-        grouped[match.group("id")].append((match.group("type"), match.group("epoch"), match.group("body"), raw))
+        grouped[match.group("id")].append(
+            (match.group("type"), match.group("epoch"), match.group("body"), raw)
+        )
     events: list[TimelineEvent] = []
     for audit_id, records in grouped.items():
         timestamp = parse_epoch(records[0][1])
@@ -57,7 +65,9 @@ def parse(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
             for item in type_fields:
                 fields.update(item)
         event_type = _primary_type(by_type)
-        action, category, severity, mitre, tags, detections = _classify(event_type, by_type, fields)
+        action, category, severity, mitre, tags, detections = _classify(
+            event_type, by_type, fields
+        )
         command = _command_from_records(by_type, fields)
         file_path = _path_from_records(by_type)
         event = TimelineEvent(
@@ -109,13 +119,24 @@ def parse(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
 
 
 def _primary_type(by_type: dict[str, list[dict[str, str]]]) -> str:
-    for candidate in ("EXECVE", "USER_CMD", "SYSCALL", "PATH", "USER_LOGIN", "USER_AUTH", "SERVICE_START", "SERVICE_STOP"):
+    for candidate in (
+        "EXECVE",
+        "USER_CMD",
+        "SYSCALL",
+        "PATH",
+        "USER_LOGIN",
+        "USER_AUTH",
+        "SERVICE_START",
+        "SERVICE_STOP",
+    ):
         if candidate in by_type:
             return candidate
     return next(iter(by_type))
 
 
-def _command_from_records(by_type: dict[str, list[dict[str, str]]], fields: dict[str, str]) -> str | None:
+def _command_from_records(
+    by_type: dict[str, list[dict[str, str]]], fields: dict[str, str]
+) -> str | None:
     if "EXECVE" in by_type:
         args = []
         merged = {}
@@ -132,11 +153,15 @@ def _command_from_records(by_type: dict[str, list[dict[str, str]]], fields: dict
 
 
 def _path_from_records(by_type: dict[str, list[dict[str, str]]]) -> str | None:
-    paths = [record.get("name") for record in by_type.get("PATH", []) if record.get("name")]
+    paths = [
+        record.get("name") for record in by_type.get("PATH", []) if record.get("name")
+    ]
     return paths[0] if paths else None
 
 
-def _classify(event_type: str, by_type: dict[str, list[dict[str, str]]], fields: dict[str, str]):
+def _classify(
+    event_type: str, by_type: dict[str, list[dict[str, str]]], fields: dict[str, str]
+) -> tuple[str, str, str, list[str], list[str], list[str]]:
     action = "audit_event"
     category = "audit"
     severity = "informational"
@@ -148,7 +173,13 @@ def _classify(event_type: str, by_type: dict[str, list[dict[str, str]]], fields:
         category = "execution"
         severity = "low"
         mitre = ["T1059.004"]
-    elif event_type in {"USER_CHAUTHTOK", "USER_ACCT", "ADD_USER", "DEL_USER", "USER_MGMT"}:
+    elif event_type in {
+        "USER_CHAUTHTOK",
+        "USER_ACCT",
+        "ADD_USER",
+        "DEL_USER",
+        "USER_MGMT",
+    }:
         action = "user_account_change"
         category = "persistence"
         severity = "medium"
