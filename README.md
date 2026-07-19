@@ -28,10 +28,11 @@ Tagline: **Excavate the timeline. Preserve the proof.**
   </a>
 </p>
 
-This 35-second walkthrough uses the bundled synthetic fixture. It demonstrates
-archive intake, investigation-profile selection, evidence-range inspection,
-incident settings and IoCs, Live Run progress, summary review, raw-event
-validation, and analyst annotation. Select the preview to open the
+This 28-second cursor-driven walkthrough uses the bundled synthetic fixture. It
+demonstrates archive intake, investigation-profile selection, evidence-range
+inspection, incident settings and IoCs, Live Run progress, summary review,
+raw-event validation, and analyst annotation through a natural browser workflow.
+Select the preview to open the
 [full-resolution WebM video](docs/media/tracequarry-walkthrough.webm).
 
 ## Why Analysts Use TraceQuarry
