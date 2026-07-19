@@ -13,6 +13,8 @@ All notable TraceQuarry changes are documented here. The project follows
   manifest consistency regression.
 - Added verified full-history Gitleaks scanning and immutable commit pins for
   every GitHub Action used by CI and release workflows.
+- Expanded post-public branch protection to require pull requests and all CI,
+  Snyk, Gitleaks, CodeQL, and dependency-review checks.
 - Regression coverage for tar traversal and archive-link handling.
 
 ### Changed

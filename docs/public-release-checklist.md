@@ -46,9 +46,13 @@ tools/configure_github_security.sh Chill-Ethical-People/TraceQuarry
 ```
 
 This enables private vulnerability reporting, Dependabot vulnerability alerts,
-automated security fixes, and `main` protection requiring the Python 3.11 and
-3.12 CI checks. CodeQL and dependency review automatically activate for public
-repository events.
+automated security fixes, and pull-request protection on `main`. The protection
+requires Python 3.11 and 3.12 CI, Snyk Open Source, Gitleaks history scanning,
+CodeQL, and dependency review. CodeQL and dependency review automatically
+activate for public repository events.
+
+Confirm all six required checks pass on a public test pull request before
+publishing the beta release announcement.
 
 ## First Beta Release
 
