@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import ipaddress
-from pathlib import Path
 import re
 import subprocess
 import sys
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_SUFFIXES = (
@@ -61,6 +60,7 @@ IP_RE = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])")
 LOCAL_HOME_RE = re.compile(
     r"(?:/" + "Users/" + r"|[A-Za-z]:\\" + "Users" + r"\\)[^/\\\s]+[/\\]"
 )
+DUPLICATE_SIDECAR_RE = re.compile(r"(?:^|/)[^/]+ \d+$")
 ALLOWED_PUBLIC_NETWORKS = tuple(
     ipaddress.ip_network(value)
     for value in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")
@@ -87,6 +87,8 @@ def main() -> int:
     failures: list[str] = []
     for relative in tracked_files():
         lower = relative.lower()
+        if DUPLICATE_SIDECAR_RE.search(relative):
+            failures.append(f"cloud-sync duplicate sidecar is tracked: {relative}")
         if lower.startswith(GENERATED_PREFIXES):
             failures.append(f"generated case material is tracked: {relative}")
         if lower.endswith(EVIDENCE_SUFFIXES):

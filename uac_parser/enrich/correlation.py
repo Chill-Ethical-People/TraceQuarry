@@ -4,7 +4,6 @@ from collections import defaultdict
 
 from uac_parser.timeline.event import TimelineEvent
 
-
 STATE_SOURCES = {
     "authorized_keys",
     "cron_file",
@@ -50,7 +49,9 @@ def correlate_state_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
         event.timezone_confidence = "correlated"
         event.confidence = _lower_confidence(event.confidence)
         event.tags = sorted(set(event.tags + ["correlated_time"]))
-        event.detection_names = sorted(set(event.detection_names + ["state_time_correlated"]))
+        event.detection_names = sorted(
+            set(event.detection_names + ["state_time_correlated"])
+        )
         event.ttp_flags = sorted(set(event.ttp_flags + ["state_time_correlated"]))
         event.related_event_ids = sorted({e.event_id for e in correlated if e.event_id})
         event.extra["correlation"] = {
@@ -77,7 +78,12 @@ def _norm(path: str | None) -> str:
     value = path.strip()
     if value.startswith("./"):
         value = value[1:]
-    if value.startswith("root/") or value.startswith("etc/") or value.startswith("home/") or value.startswith("var/"):
+    if (
+        value.startswith("root/")
+        or value.startswith("etc/")
+        or value.startswith("home/")
+        or value.startswith("var/")
+    ):
         value = "/" + value
     return value.replace("//", "/")
 
@@ -87,7 +93,9 @@ def _best_timestamp(events: list[TimelineEvent]) -> TimelineEvent | None:
     timestamped = [event for event in events if event.timestamp]
     if not timestamped:
         return None
-    return sorted(timestamped, key=lambda e: (priority.get(e.timestamp_type, 99), e.timestamp))[0]
+    return sorted(
+        timestamped, key=lambda e: (priority.get(e.timestamp_type, 99), e.timestamp)
+    )[0]
 
 
 def _lower_confidence(confidence: str) -> str:

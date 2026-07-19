@@ -24,13 +24,36 @@ PATTERNS = {
     "syslog": ("*syslog*", "*messages*", "*kern.log*"),
     "auditd": ("*audit.log*", "audit.log*"),
     "cron": ("*cron*",),
-    "cron_file": ("etc/crontab", "etc/cron.d/*", "var/spool/cron/*", "var/spool/cron/crontabs/*"),
+    "cron_file": (
+        "etc/crontab",
+        "etc/cron.d/*",
+        "var/spool/cron/*",
+        "var/spool/cron/crontabs/*",
+    ),
     "shell_history": (".bash_history", ".zsh_history", ".sh_history", ".*history"),
-    "package_log": ("*dpkg.log*", "*apt/history.log*", "*yum.log*", "*dnf.log*", "*zypper.log*"),
+    "package_log": (
+        "*dpkg.log*",
+        "*apt/history.log*",
+        "*yum.log*",
+        "*dnf.log*",
+        "*zypper.log*",
+    ),
     "systemd": ("*systemctl*", "*journal*"),
-    "systemd_unit": ("etc/systemd/system/*.service", "etc/systemd/system/*.timer", "home/*/.config/systemd/user/*.service", "root/.config/systemd/user/*.service"),
+    "systemd_unit": (
+        "etc/systemd/system/*.service",
+        "etc/systemd/system/*.timer",
+        "home/*/.config/systemd/user/*.service",
+        "root/.config/systemd/user/*.service",
+    ),
     "web_log": ("*access.log*", "*error.log*", "*nginx*", "*apache*", "*httpd*"),
-    "login_history": ("*last.txt", "*lastb.txt", "*login_history*", "*failed_logins*", "*wtmp.txt", "*btmp.txt"),
+    "login_history": (
+        "*last.txt",
+        "*lastb.txt",
+        "*login_history*",
+        "*failed_logins*",
+        "*wtmp.txt",
+        "*btmp.txt",
+    ),
     "passwd": ("etc/passwd",),
     "shadow": ("etc/shadow",),
     "group": ("etc/group",),
@@ -38,7 +61,15 @@ PATTERNS = {
     "authorized_keys": ("home/*/.ssh/authorized_keys", "root/.ssh/authorized_keys"),
     "known_hosts": ("home/*/.ssh/known_hosts", "root/.ssh/known_hosts"),
     "sshd_config": ("etc/ssh/sshd_config", "etc/ssh/sshd_config.d/*"),
-    "profile": ("etc/profile", "etc/profile.d/*", "home/*/.bashrc", "home/*/.profile", "home/*/.bash_profile", "root/.bashrc", "root/.profile"),
+    "profile": (
+        "etc/profile",
+        "etc/profile.d/*",
+        "home/*/.bashrc",
+        "home/*/.profile",
+        "home/*/.bash_profile",
+        "root/.bashrc",
+        "root/.profile",
+    ),
     "ld_preload": ("etc/ld.so.preload",),
     "pam_config": ("etc/pam.d/*",),
     "rc_local": ("etc/rc.local", "etc/init.d/*"),
@@ -60,12 +91,14 @@ def discover_sources(root: Path) -> list[SourceFile]:
                 if path.is_file() and path.stat().st_size < 200 * 1024 * 1024:
                     if not _valid_source(source_type, rel):
                         continue
-                    sources.append(SourceFile(
-                        path=path,
-                        relative=rel,
-                        source_type=source_type,
-                        size=path.stat().st_size,
-                    ))
+                    sources.append(
+                        SourceFile(
+                            path=path,
+                            relative=rel,
+                            source_type=source_type,
+                            size=path.stat().st_size,
+                        )
+                    )
     seen: set[str] = set()
     unique: list[SourceFile] = []
     for source in sources:

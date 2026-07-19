@@ -33,7 +33,9 @@ def load_registry() -> dict[str, Any]:
     if not isinstance(tools, dict):
         raise RegistryError("Tagging registry tool_tags must be a mapping.")
     for tool_id, rule in tools.items():
-        if not isinstance(rule, dict) or not isinstance(rule.get("match_literals"), list):
+        if not isinstance(rule, dict) or not isinstance(
+            rule.get("match_literals"), list
+        ):
             raise RegistryError(f"Tool rule {tool_id!r} requires match_literals.")
     return data
 

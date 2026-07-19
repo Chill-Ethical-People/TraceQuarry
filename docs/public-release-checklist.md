@@ -7,7 +7,31 @@ Use this checklist before changing TraceQuarry from private to public.
 - Confirm `main` contains only TraceQuarry source and synthetic fixtures.
 - Confirm the reachable history contains no prior workspace commits, evidence,
   credentials, malware, or customer identifiers.
-- Run `python3 -m unittest discover -s tests -v` from a fresh clone.
+- Confirm the checkout is healthy and contains no cloud-sync duplicate refs or
+  sidecars:
+
+  ```bash
+  git fsck --full --no-reflogs
+  find . -path ./.git -prune -o -type f -name '* 2' -print
+  ```
+- Install `.[dev]` and run the release gates from a fresh clone:
+
+  ```bash
+  python3 tools/check_repository_hygiene.py
+  ruff check uac_parser tests tools
+  ruff format --check uac_parser tests tools
+  mypy uac_parser
+  bandit -q -c pyproject.toml -r uac_parser
+  coverage run -m unittest discover -s tests -v
+  coverage report
+  pip-audit . --strict --progress-spinner off
+  snyk test --file=requirements.txt --package-manager=pip --severity-threshold=low
+  gitleaks git --redact --no-banner --verbose .
+  ```
+
+- Confirm the `SNYK_TOKEN` repository secret is configured and the Snyk Open
+  Source workflow passes. Record the Snyk Code result separately when that
+  product is enabled for the Snyk organization.
 - Confirm the Python 3.11 and 3.12 CI jobs pass.
 - Review open pull requests, issues, Actions logs, and release drafts for
   sensitive information.
@@ -18,7 +42,7 @@ Use this checklist before changing TraceQuarry from private to public.
 Run the included GitHub hardening helper:
 
 ```bash
-tools/configure_github_security.sh Chill-Ethical-People/tracequarry
+tools/configure_github_security.sh Chill-Ethical-People/TraceQuarry
 ```
 
 This enables private vulnerability reporting, Dependabot vulnerability alerts,

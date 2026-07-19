@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
+from pathlib import Path
 
 from uac_parser.timeline.event import TimelineEvent
 
 from .common import read_text_lines
-
 
 SS_RE = re.compile(
     r"^(?P<state>\S+)\s+\d+\s+\d+\s+"
@@ -25,13 +24,38 @@ NETSTAT_RE = re.compile(
 PROC_IN_PARENS = re.compile(r'"([^"]+)",pid=(\d+)')
 
 SUSPICIOUS_OUTBOUND_PORTS = {
-    "4444", "4445", "5555", "6666", "6667", "6668", "6669",
-    "1337", "31337", "8888", "9001", "9090", "1234",
+    "4444",
+    "4445",
+    "5555",
+    "6666",
+    "6667",
+    "6668",
+    "6669",
+    "1337",
+    "31337",
+    "8888",
+    "9001",
+    "9090",
+    "1234",
 }
 
 WELL_KNOWN_OUTBOUND = {
-    "22", "25", "53", "80", "443", "465", "587", "993", "995",
-    "123", "514", "4505", "4506", "8443", "8080", "9443",
+    "22",
+    "25",
+    "53",
+    "80",
+    "443",
+    "465",
+    "587",
+    "993",
+    "995",
+    "123",
+    "514",
+    "4505",
+    "4506",
+    "8443",
+    "8080",
+    "9443",
 }
 
 
@@ -51,9 +75,13 @@ def parse_ss(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
         proc_name, pid = _extract_proc(procs_raw)
 
         if peer in {"*", "0.0.0.0", "::", "[::]"} or state == "LISTEN":
-            event = _listening_event(local, lport, proc_name, pid, state, raw, relative, host)
+            event = _listening_event(
+                local, lport, proc_name, pid, state, raw, relative, host
+            )
         else:
-            event = _connection_event(local, lport, peer, pport, proc_name, pid, state, raw, relative, host)
+            event = _connection_event(
+                local, lport, peer, pport, proc_name, pid, state, raw, relative, host
+            )
         events.append(event)
     return events
 
@@ -78,9 +106,13 @@ def parse_netstat(path: Path, relative: str, host: str = "") -> list[TimelineEve
             proc_name = proc_match.group(2)
 
         if peer in {"*", "0.0.0.0", "::", "[::]"} or state == "LISTEN":
-            event = _listening_event(local, lport, proc_name, pid, state, raw, relative, host)
+            event = _listening_event(
+                local, lport, proc_name, pid, state, raw, relative, host
+            )
         else:
-            event = _connection_event(local, lport, peer, pport, proc_name, pid, state, raw, relative, host)
+            event = _connection_event(
+                local, lport, peer, pport, proc_name, pid, state, raw, relative, host
+            )
         events.append(event)
     return events
 
@@ -92,8 +124,16 @@ def _extract_proc(procs_raw: str) -> tuple[str, str]:
     return "", ""
 
 
-def _listening_event(local: str, lport: str, proc_name: str, pid: str,
-                     state: str, raw: str, relative: str, host: str) -> TimelineEvent:
+def _listening_event(
+    local: str,
+    lport: str,
+    proc_name: str,
+    pid: str,
+    state: str,
+    raw: str,
+    relative: str,
+    host: str,
+) -> TimelineEvent:
     detections = ["listening_port"]
     severity = "informational"
     try:
@@ -101,8 +141,23 @@ def _listening_event(local: str, lport: str, proc_name: str, pid: str,
     except ValueError:
         lport_int = 0
     unexpected = lport not in {
-        "22", "25", "80", "443", "8080", "8443", "3306", "5432", "6379",
-        "27017", "53", "111", "123", "514", "9090", "4505", "4506",
+        "22",
+        "25",
+        "80",
+        "443",
+        "8080",
+        "8443",
+        "3306",
+        "5432",
+        "6379",
+        "27017",
+        "53",
+        "111",
+        "123",
+        "514",
+        "9090",
+        "4505",
+        "4506",
     }
     if unexpected and lport_int > 1024:
         detections.append("unexpected_listening_port")
@@ -111,22 +166,43 @@ def _listening_event(local: str, lport: str, proc_name: str, pid: str,
         detections.append("suspicious_listening_port")
         severity = "high"
     return TimelineEvent(
-        timestamp="", timestamp_type="state_observed", timezone_confidence="missing",
-        host=host, source_path=relative, source_type="network_state", parser="network",
-        event_category="network", event_action="listening_port",
-        process=proc_name or None, pid=pid or None, port=lport,
-        severity=severity, confidence="medium",
+        timestamp="",
+        timestamp_type="state_observed",
+        timezone_confidence="missing",
+        host=host,
+        source_path=relative,
+        source_type="network_state",
+        parser="network",
+        event_category="network",
+        event_action="listening_port",
+        process=proc_name or None,
+        pid=pid or None,
+        port=lport,
+        severity=severity,
+        confidence="medium",
         tags=["network", "listening"],
-        detection_names=detections, ttp_flags=detections,
+        detection_names=detections,
+        ttp_flags=detections,
         mitre=["T1571"] if severity == "high" else [],
-        summary=f"Listening on {local}:{lport}" + (f" ({proc_name})" if proc_name else ""),
-        raw=raw, extra={"state": state, "local_addr": local},
+        summary=f"Listening on {local}:{lport}"
+        + (f" ({proc_name})" if proc_name else ""),
+        raw=raw,
+        extra={"state": state, "local_addr": local},
     )
 
 
-def _connection_event(local: str, lport: str, peer: str, pport: str,
-                      proc_name: str, pid: str, state: str,
-                      raw: str, relative: str, host: str) -> TimelineEvent:
+def _connection_event(
+    local: str,
+    lport: str,
+    peer: str,
+    pport: str,
+    proc_name: str,
+    pid: str,
+    state: str,
+    raw: str,
+    relative: str,
+    host: str,
+) -> TimelineEvent:
     detections = ["active_connection"]
     severity = "informational"
     tags = ["network", "connection"]
@@ -158,23 +234,45 @@ def _connection_event(local: str, lport: str, peer: str, pport: str,
     dst_ip = peer if is_outbound else local
 
     return TimelineEvent(
-        timestamp="", timestamp_type="state_observed", timezone_confidence="missing",
-        host=host, source_path=relative, source_type="network_state", parser="network",
+        timestamp="",
+        timestamp_type="state_observed",
+        timezone_confidence="missing",
+        host=host,
+        source_path=relative,
+        source_type="network_state",
+        parser="network",
         event_category="network",
         event_action=f"{direction}_connection",
-        src_ip=src_ip, dst_ip=dst_ip, port=pport if is_outbound else lport,
-        process=proc_name or None, pid=pid or None,
-        severity=severity, confidence="medium",
-        tags=tags, detection_names=detections, ttp_flags=detections, mitre=mitre,
-        summary=f"{direction.title()} {state} {local}:{lport} -> {peer}:{pport}" + (f" ({proc_name})" if proc_name else ""),
-        raw=raw, extra={"state": state, "direction": direction},
+        src_ip=src_ip,
+        dst_ip=dst_ip,
+        port=pport if is_outbound else lport,
+        process=proc_name or None,
+        pid=pid or None,
+        severity=severity,
+        confidence="medium",
+        tags=tags,
+        detection_names=detections,
+        ttp_flags=detections,
+        mitre=mitre,
+        summary=f"{direction.title()} {state} {local}:{lport} -> {peer}:{pport}"
+        + (f" ({proc_name})" if proc_name else ""),
+        raw=raw,
+        extra={"state": state, "direction": direction},
     )
 
 
 def _is_listening_port(port: str) -> bool:
     try:
         return int(port) < 1024 or int(port) in {
-            4505, 4506, 8080, 8443, 3306, 5432, 6379, 9090, 27017,
+            4505,
+            4506,
+            8080,
+            8443,
+            3306,
+            5432,
+            6379,
+            9090,
+            27017,
         }
     except ValueError:
         return False

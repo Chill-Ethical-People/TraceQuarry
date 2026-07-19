@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from hashlib import sha1
 import json
-from typing import Iterable
+from collections.abc import Iterable
+from dataclasses import replace
+from hashlib import sha256
 
 from .event import TimelineEvent
 
@@ -34,15 +34,23 @@ def assign_event_ids(events: Iterable[TimelineEvent]) -> list[TimelineEvent]:
             "raw": event.raw,
             "extra": event.extra,
         }
-        basis = json.dumps(identity, sort_keys=True, ensure_ascii=False, default=str, separators=(",", ":"))
+        basis = json.dumps(
+            identity,
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+            separators=(",", ":"),
+        )
         if event.event_id:
             prior = claimed.get(event.event_id)
             if prior is not None and prior != basis:
-                raise ValueError(f"Event ID collision for non-identical evidence: {event.event_id}")
+                raise ValueError(
+                    f"Event ID collision for non-identical evidence: {event.event_id}"
+                )
             claimed[event.event_id] = basis
             output.append(event)
             continue
-        digest = sha1(basis.encode("utf-8", "replace")).hexdigest()
+        digest = sha256(basis.encode("utf-8", "replace")).hexdigest()
         length = 20
         event_id = "evt_" + digest[:length]
         while event_id in claimed and claimed[event_id] != basis:
@@ -56,7 +64,10 @@ def assign_event_ids(events: Iterable[TimelineEvent]) -> list[TimelineEvent]:
 
 
 def sort_events(events: Iterable[TimelineEvent]) -> list[TimelineEvent]:
-    return sorted(events, key=lambda e: (e.timestamp or "9999", e.source_path, e.event_action, e.raw))
+    return sorted(
+        events,
+        key=lambda e: (e.timestamp or "9999", e.source_path, e.event_action, e.raw),
+    )
 
 
 def dedupe_events(events: Iterable[TimelineEvent]) -> list[TimelineEvent]:
@@ -84,7 +95,9 @@ def dedupe_events(events: Iterable[TimelineEvent]) -> list[TimelineEvent]:
     return output
 
 
-def filter_window(events: Iterable[TimelineEvent], start: str | None, end: str | None) -> list[TimelineEvent]:
+def filter_window(
+    events: Iterable[TimelineEvent], start: str | None, end: str | None
+) -> list[TimelineEvent]:
     output = []
     for event in events:
         if not event.timestamp:

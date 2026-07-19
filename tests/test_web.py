@@ -1,19 +1,19 @@
-import json
 import http.client
-from pathlib import Path
+import json
 import stat
 import tempfile
 import threading
 import unittest
+from pathlib import Path
 
 from uac_parser import web
 from uac_parser.web import (
     JOBS,
     JOBS_LOCK,
     SERVER_CONFIG,
-    _save_annotation,
     _is_loopback_authority,
     _is_loopback_origin,
+    _save_annotation,
     _timeline_page,
     _utc_iso_to_local_value,
     render_index,
@@ -34,7 +34,7 @@ class WebTests(unittest.TestCase):
         self.assertIn("Prioritizes evidence and analyst pivots", page)
         self.assertIn("Explore Timeline", page)
         self.assertIn("Raw evidence", page)
-        self.assertIn('/assets/cep-mark.svg', page)
+        self.assertIn("/assets/cep-mark.svg", page)
         self.assertNotIn("cep-lockup.svg", page)
         self.assertIn("X-TraceQuarry-CSRF", page)
         self.assertNotIn("fonts.googleapis.com", page)
@@ -77,8 +77,13 @@ class WebTests(unittest.TestCase):
                 },
             ]
             timeline = output / "timeline_mini.jsonl"
-            timeline.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
-            (output / "timeline_full.jsonl").write_text(timeline.read_text(), encoding="utf-8")
+            timeline.write_text(
+                "\n".join(json.dumps(event) for event in events) + "\n",
+                encoding="utf-8",
+            )
+            (output / "timeline_full.jsonl").write_text(
+                timeline.read_text(), encoding="utf-8"
+            )
             SERVER_CONFIG["work_dir"] = work_dir
             with JOBS_LOCK:
                 JOBS["abc123def456"] = {
@@ -87,19 +92,29 @@ class WebTests(unittest.TestCase):
                     "output": str(output),
                 }
             try:
-                page = _timeline_page("abc123def456", {"q": ["root"], "severity": ["high"]})
+                page = _timeline_page(
+                    "abc123def456", {"q": ["root"], "severity": ["high"]}
+                )
                 self.assertEqual(page["total"], 1)
                 self.assertEqual(page["items"][0]["event_id"], "evt_abc123")
 
-                saved = _save_annotation("abc123def456", {
-                    "event_id": "evt_abc123",
-                    "disposition": "malicious",
-                    "tags": ["Confirmed Access", "escalate"],
-                    "note": "Validated against the raw authentication record.",
-                })
+                saved = _save_annotation(
+                    "abc123def456",
+                    {
+                        "event_id": "evt_abc123",
+                        "disposition": "malicious",
+                        "tags": ["Confirmed Access", "escalate"],
+                        "note": "Validated against the raw authentication record.",
+                    },
+                )
                 self.assertTrue(saved["saved"])
-                annotation_doc = json.loads((output / "analyst_annotations.json").read_text())
-                self.assertEqual(stat.S_IMODE((output / "analyst_annotations.json").stat().st_mode), 0o600)
+                annotation_doc = json.loads(
+                    (output / "analyst_annotations.json").read_text()
+                )
+                self.assertEqual(
+                    stat.S_IMODE((output / "analyst_annotations.json").stat().st_mode),
+                    0o600,
+                )
                 self.assertEqual(
                     annotation_doc["annotations"]["evt_abc123"]["tags"],
                     ["confirmed_access", "escalate"],
@@ -122,15 +137,19 @@ class WebSecurityIntegrationTests(unittest.TestCase):
         (self.work_dir / "uploads").mkdir(mode=0o700)
         (self.work_dir / "outputs").mkdir(mode=0o700)
         SERVER_CONFIG.clear()
-        SERVER_CONFIG.update({
-            "work_dir": self.work_dir,
-            "max_request_bytes": 1024 * 1024,
-            "max_work_bytes": 10 * 1024 * 1024,
-            "request_timeout": 5,
-            "debug": False,
-        })
+        SERVER_CONFIG.update(
+            {
+                "work_dir": self.work_dir,
+                "max_request_bytes": 1024 * 1024,
+                "max_work_bytes": 10 * 1024 * 1024,
+                "request_timeout": 5,
+                "debug": False,
+            }
+        )
         web.JOB_SLOTS = threading.BoundedSemaphore(1)
-        self.server = web.HardenedThreadingHTTPServer(("127.0.0.1", 0), web.UacWebHandler)
+        self.server = web.HardenedThreadingHTTPServer(
+            ("127.0.0.1", 0), web.UacWebHandler
+        )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -143,8 +162,17 @@ class WebSecurityIntegrationTests(unittest.TestCase):
             JOBS.clear()
         self.temporary.cleanup()
 
-    def request(self, method: str, path: str, *, body: bytes | None = None, headers: dict[str, str] | None = None):
-        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ):
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.server.server_port, timeout=5
+        )
         connection.request(method, path, body=body, headers=headers or {})
         response = connection.getresponse()
         payload = response.read()
@@ -192,25 +220,39 @@ class WebSecurityIntegrationTests(unittest.TestCase):
     def test_post_requires_token_and_rejects_hostile_origin(self) -> None:
         body = b"input_path=/tmp/does-not-matter"
         base_headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        missing_status, _, _ = self.request("POST", "/api/run", body=body, headers=base_headers)
-        hostile_status, _, _ = self.request("POST", "/api/run", body=body, headers={
-            **base_headers,
-            "Origin": "https://attacker.example",
-            "X-TraceQuarry-CSRF": web.CSRF_TOKEN,
-        })
+        missing_status, _, _ = self.request(
+            "POST", "/api/run", body=body, headers=base_headers
+        )
+        hostile_status, _, _ = self.request(
+            "POST",
+            "/api/run",
+            body=body,
+            headers={
+                **base_headers,
+                "Origin": "https://attacker.example",
+                "X-TraceQuarry-CSRF": web.CSRF_TOKEN,
+            },
+        )
 
         self.assertEqual(missing_status, 403)
         self.assertEqual(hostile_status, 403)
 
-        hostile_host_status, _, _ = self.request("GET", "/", headers={"Host": "attacker.example"})
+        hostile_host_status, _, _ = self.request(
+            "GET", "/", headers={"Host": "attacker.example"}
+        )
         self.assertEqual(hostile_host_status, 421)
 
     def test_oversized_request_is_rejected_before_processing(self) -> None:
         SERVER_CONFIG["max_request_bytes"] = 4
-        status, _, body = self.request("POST", "/api/run", body=b"12345", headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-TraceQuarry-CSRF": web.CSRF_TOKEN,
-        })
+        status, _, body = self.request(
+            "POST",
+            "/api/run",
+            body=b"12345",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-TraceQuarry-CSRF": web.CSRF_TOKEN,
+            },
+        )
 
         self.assertEqual(status, 413)
         self.assertIn(b"upload limit", body)
@@ -223,7 +265,10 @@ class WebSecurityIntegrationTests(unittest.TestCase):
                 "status": "complete",
                 "input": "/sensitive/input.tar.gz",
                 "output": "/sensitive/output",
-                "options": {"input_path": "/sensitive/input.tar.gz", "timezone_name": "UTC"},
+                "options": {
+                    "input_path": "/sensitive/input.tar.gz",
+                    "timezone_name": "UTC",
+                },
                 "result": {"output": "/sensitive/output", "events": 1},
                 "traceback": "/sensitive/source.py:1",
             }

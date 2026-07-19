@@ -1,0 +1,4 @@
+# Snyk Open Source and deployment baseline. Keep runtime packages aligned with
+# [project].dependencies in pyproject.toml; tests/test_dependency_manifest.py
+# enforces the relationship.
+PyYAML==6.0.3

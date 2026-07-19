@@ -21,19 +21,53 @@ classifiers = [
 dependencies = ["PyYAML>=6.0.2,<7"]
 
 [project.urls]
-Homepage = "https://github.com/Chill-Ethical-People/tracequarry"
-Documentation = "https://github.com/Chill-Ethical-People/tracequarry#readme"
-Issues = "https://github.com/Chill-Ethical-People/tracequarry/issues"
-Security = "https://github.com/Chill-Ethical-People/tracequarry/security/policy"
+Homepage = "https://github.com/Chill-Ethical-People/TraceQuarry"
+Documentation = "https://github.com/Chill-Ethical-People/TraceQuarry#readme"
+Issues = "https://github.com/Chill-Ethical-People/TraceQuarry/issues"
+Security = "https://github.com/Chill-Ethical-People/TraceQuarry/security/policy"
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10", "ruff>=0.15,<0.16"]
+dev = [
+    "bandit>=1.8,<2",
+    "build>=1.2,<2",
+    "coverage>=7.6,<8",
+    "mypy>=1.15,<3",
+    "packaging>=24,<27",
+    "pip-audit>=2.8,<3",
+    "pytest>=8,<10",
+    "ruff>=0.15,<0.16",
+    "twine>=6,<7",
+    "types-PyYAML>=6.0.12,<7",
+]
 
 [tool.ruff]
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["uac_parser"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+# These literals are evidence values parsed by TraceQuarry, not bind addresses,
+# temporary-file creation, or SQL construction.
+skips = ["B104", "B108", "B608"]
+
+[tool.coverage.run]
+source = ["uac_parser"]
+
+[tool.coverage.report]
+fail_under = 65
+show_missing = true
+skip_covered = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

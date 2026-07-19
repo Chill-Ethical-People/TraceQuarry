@@ -7,7 +7,12 @@ import sys
 
 from uac_parser.assist import profile_choices
 from uac_parser.enrich.iocs import load_iocs, parse_ioc_text
-from uac_parser.pipeline import run_case_pipeline, run_pipeline
+from uac_parser.pipeline import (
+    CasePipelineResult,
+    PipelineResult,
+    run_case_pipeline,
+    run_pipeline,
+)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -15,19 +20,61 @@ def build_arg_parser() -> argparse.ArgumentParser:
         prog="uac-timeline",
         description="TraceQuarry: parse UAC collections into normalized Linux forensic timelines with TTP enrichment.",
     )
-    parser.add_argument("input", nargs="?", help="UAC archive (.tar, .tar.gz, .tgz, .zip) or extracted directory")
+    parser.add_argument(
+        "input",
+        nargs="?",
+        help="UAC archive (.tar, .tar.gz, .tgz, .zip) or extracted directory",
+    )
     parser.add_argument("--out", help="Output directory for single-collection mode")
-    parser.add_argument("--input", action="append", dest="case_inputs", default=[], help="UAC input for case mode. Repeat for multiple collections.")
-    parser.add_argument("--input-manifest", help="Text file of UAC inputs for case mode. One archive or directory per line.")
-    parser.add_argument("--case-out", help="Output directory for multi-collection case workspace")
-    parser.add_argument("--case-name", default="TraceQuarry Case", help="Case name for multi-collection summaries")
-    parser.add_argument("--incident-start", help="Mini-timeline start timestamp, e.g. 2026-06-16T08:00:00Z")
-    parser.add_argument("--incident-end", help="Mini-timeline end timestamp, e.g. 2026-06-16T12:00:00Z")
-    parser.add_argument("--year", type=int, help="Year to apply to syslog-style timestamps that omit a year")
-    parser.add_argument("--timezone", default="UTC", help="Timezone for syslog-style local timestamps, e.g. UTC or Asia/Hong_Kong")
-    parser.add_argument("--host", default="", help="Host override when UAC layout does not reveal it")
-    parser.add_argument("--ioc", action="append", default=[], help="Known IoC to match. Repeatable. Values may be IPs, domains, hashes, paths, users, or literals.")
-    parser.add_argument("--ioc-file", help="Text/CSV file of IoCs. One IoC per line, or value,kind,label.")
+    parser.add_argument(
+        "--input",
+        action="append",
+        dest="case_inputs",
+        default=[],
+        help="UAC input for case mode. Repeat for multiple collections.",
+    )
+    parser.add_argument(
+        "--input-manifest",
+        help="Text file of UAC inputs for case mode. One archive or directory per line.",
+    )
+    parser.add_argument(
+        "--case-out", help="Output directory for multi-collection case workspace"
+    )
+    parser.add_argument(
+        "--case-name",
+        default="TraceQuarry Case",
+        help="Case name for multi-collection summaries",
+    )
+    parser.add_argument(
+        "--incident-start",
+        help="Mini-timeline start timestamp, e.g. 2026-06-16T08:00:00Z",
+    )
+    parser.add_argument(
+        "--incident-end", help="Mini-timeline end timestamp, e.g. 2026-06-16T12:00:00Z"
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        help="Year to apply to syslog-style timestamps that omit a year",
+    )
+    parser.add_argument(
+        "--timezone",
+        default="UTC",
+        help="Timezone for syslog-style local timestamps, e.g. UTC or Asia/Hong_Kong",
+    )
+    parser.add_argument(
+        "--host", default="", help="Host override when UAC layout does not reveal it"
+    )
+    parser.add_argument(
+        "--ioc",
+        action="append",
+        default=[],
+        help="Known IoC to match. Repeatable. Values may be IPs, domains, hashes, paths, users, or literals.",
+    )
+    parser.add_argument(
+        "--ioc-file",
+        help="Text/CSV file of IoCs. One IoC per line, or value,kind,label.",
+    )
     parser.add_argument(
         "--threat-type",
         choices=[profile["id"] for profile in profile_choices()],
@@ -44,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     iocs.extend(load_iocs(args.ioc_file))
     iocs.extend(parse_ioc_text("\n".join(args.ioc)))
     try:
+        result: CasePipelineResult | PipelineResult
         if args.case_out:
             inputs = []
             if args.input:
@@ -51,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
             inputs.extend(args.case_inputs)
             inputs.extend(_load_manifest(args.input_manifest))
             if not inputs:
-                raise SystemExit("Case mode requires a positional input, --input, or --input-manifest.")
+                raise SystemExit(
+                    "Case mode requires a positional input, --input, or --input-manifest."
+                )
             result = run_case_pipeline(
                 inputs,
                 args.case_out,
