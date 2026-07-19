@@ -96,7 +96,11 @@ def parse_shell_history(
 def parse_package_log(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
     events = []
     for raw in read_text_lines(path):
-        ts = parse_any(raw[:25])
+        timestamp_candidates = (raw[:25].strip(), raw.split(maxsplit=1)[0])
+        ts = next(
+            (parsed for value in timestamp_candidates if (parsed := parse_any(value))),
+            None,
+        )
         if not ts:
             continue
         action = "package_activity"

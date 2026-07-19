@@ -63,9 +63,10 @@ skips = ["B104", "B108", "B608"]
 
 [tool.coverage.run]
 source = ["uac_parser"]
+branch = true
 
 [tool.coverage.report]
-fail_under = 65
+fail_under = 75
 show_missing = true
 skip_covered = true
 

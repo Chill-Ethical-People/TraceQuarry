@@ -110,13 +110,16 @@ def parse(
                 event.event_category = "privilege"
                 event.event_action = "sudo_command"
                 event.user = sudo.group("user")
-                event.command = sudo.group("command")
+                event.command = sudo.group("command").strip()
                 event.mitre = ["T1548.003"]
                 event.severity = "medium"
                 event.confidence = "high"
                 event.tags = ["sudo", "privilege_escalation", "command"]
                 event.summary = f"{event.user} ran sudo command: {event.command}"
-                event.extra = {"pwd": sudo.group("pwd"), "runas": sudo.group("runas")}
+                event.extra = {
+                    "pwd": sudo.group("pwd").strip(),
+                    "runas": sudo.group("runas").strip(),
+                }
                 events.append(event)
                 continue
         if proc and "su" in proc and "session opened" in msg:

@@ -8,7 +8,7 @@ All notable TraceQuarry changes are documented here. The project follows
 ### Added
 
 - Enforced Ruff formatting and linting, strict MyPy checks, Bandit scanning,
-  dependency auditing, and a 65% coverage floor in CI and release workflows.
+  dependency auditing, and a 75% branch-coverage floor in CI and release workflows.
 - Added Snyk Open Source CI testing, scheduled monitoring, and a dependency
   manifest consistency regression.
 - Added verified full-history Gitleaks scanning and immutable commit pins for
