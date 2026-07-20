@@ -14,12 +14,34 @@
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
 
-TraceQuarry is a local-first Linux DFIR workbench for Unix-like Artifacts
-Collector (UAC) evidence. It converts a UAC archive or extracted UAC directory
-into defensible incident timelines, source coverage indexes, IoC hits, and
-high-signal findings for responder review.
+TraceQuarry is a local-first Linux DFIR workbench for
+[Unix-like Artifacts Collector (UAC)](https://github.com/tclahr/uac) evidence.
+It converts a UAC archive or extracted UAC directory into defensible incident
+timelines, source coverage indexes, IoC hits, and high-signal findings for
+responder review.
 
 Tagline: **Excavate the timeline. Preserve the proof.**
+
+## Relationship To UAC
+
+UAC is the upstream collection project; TraceQuarry is an independent downstream
+parser and analysis workbench maintained by Chill Ethical People. TraceQuarry is
+not affiliated with, maintained by, certified by, or endorsed by the UAC project.
+It does not bundle, modify, or redistribute UAC. The UAC name is used only to
+describe input compatibility and to credit the collection format that makes this
+workflow possible.
+
+TraceQuarry compatibility is based on recognized artifact paths and output
+formats rather than a formal UAC compatibility certification. Report collection
+failures and missing upstream artifacts to UAC only when they are reproducible in
+UAC itself. Report parsing, normalization, enrichment, timeline, and TraceQuarry
+GUI issues in the [TraceQuarry issue tracker](https://github.com/Chill-Ethical-People/TraceQuarry/issues).
+Never attach real incident collections or sensitive evidence to a public issue.
+
+TraceQuarry can also process an extracted directory or archive containing
+recognizably named Linux logs, even when it was not produced by UAC. Generic log
+intake is currently filename- and format-driven; arbitrary source mappings and
+single-log-file intake are not yet first-class interfaces.
 
 ## Guided Walkthrough
 
