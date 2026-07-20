@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Chill-Ethical-People/TraceQuarry/security/advisories/new
+    about: Privately report a vulnerability in TraceQuarry.
+  - name: Sensitive contact
+    url: mailto:contact@chillethicalpeople.com
+    about: Contact the maintainers without publishing incident information.

@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a parser, workflow, integration, or detection improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: DFIR problem
+      description: Describe the investigation need and the evidence source involved.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: Explain the expected analyst workflow and outputs.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: References and provenance
+      description: Link authoritative artifact documentation or public threat research where applicable.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation approach
+      description: Describe synthetic fixtures and expected results that could test the capability.
+
