@@ -10,6 +10,16 @@ By submitting a pull request, patch, issue attachment, or other contribution,
 you agree that your contribution is provided under the Apache License, Version
 2.0, unless you explicitly mark it as "Not a Contribution."
 
+Kensho is the creator, original copyright owner, and project steward of
+TraceQuarry. Chill Ethical People is the organizational home and maintainer
+community. Organization membership, repository permissions, or maintainer
+status does not transfer ownership of the original project.
+
+You retain copyright in your contribution unless you enter into a separate
+written copyright assignment. Submission under Apache-2.0 grants the project
+and its users the rights stated in that license; it is not a copyright
+assignment. See `OWNERSHIP.md`.
+
 Do not submit code, indicators, reports, evidence, screenshots, customer data,
 or third-party content that you do not have permission to share.
 

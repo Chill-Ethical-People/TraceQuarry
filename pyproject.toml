@@ -4,9 +4,10 @@ version = "0.4.0b1"
 description = "TraceQuarry: UAC-aware Linux forensic timeline parser with TTP enrichment."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-authors = [{name = "Chill Ethical People"}]
+authors = [{name = "Kensho"}]
+maintainers = [{name = "Chill Ethical People", email = "contact@chillethicalpeople.com"}]
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license-files = ["LICENSE", "NOTICE", "OWNERSHIP.md"]
 keywords = ["dfir", "forensics", "incident-response", "linux", "timeline", "uac"]
 classifiers = [
     "Development Status :: 4 - Beta",

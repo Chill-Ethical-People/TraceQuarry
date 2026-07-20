@@ -545,13 +545,20 @@ PYTHONPATH=. python3 -m uac_parser.cli tests/fixtures/uac_sample --out /tmp/trac
 ## License And Ownership
 
 TraceQuarry is released under the Apache License, Version 2.0. You can use,
-modify, and redistribute the software under that license while Chill Ethical
-People retains copyright ownership of the original project.
+modify, and redistribute the software under that license. Kensho is the creator,
+original copyright owner, and project steward. Chill Ethical People is the
+project's organizational home and maintainer community.
+
+Organization membership, repository access, or a maintainer role does not by
+itself transfer ownership of the original project. Accepted contributors retain
+copyright in their own contributions unless a separate written assignment says
+otherwise; those contributions are licensed under Apache-2.0 for inclusion in
+TraceQuarry. See `OWNERSHIP.md` for the project record.
 
 The license covers the software. The TraceQuarry name, logo, lockup, favicon,
 brand assets, and Chill Ethical People marks remain project identity assets and
-are not granted for unrelated branding or endorsement. See `LICENSE` and
-`NOTICE` for the exact terms.
+are not granted for unrelated branding or endorsement. See `LICENSE`, `NOTICE`,
+and `OWNERSHIP.md` for the exact terms and attribution record.
 
 Contributions are welcome under the same Apache-2.0 terms. Do not contribute
 real incident evidence, credentials, customer data, or third-party material that
