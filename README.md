@@ -73,6 +73,55 @@ TraceQuarry is a triage and timeline-assist tool. Findings are leads, not final
 conclusions. Validate important findings against raw source lines and surrounding
 timeline context before using them in a report.
 
+## Agent Skill For DFIR Teams
+
+TraceQuarry includes a community-ready Agent Skill in
+[`skills/tracequarry/`](skills/tracequarry/).
+It teaches a compatible coding agent how to establish case scope, run single- or
+multi-collection analysis, interpret timeline schema `1.1`, validate findings
+against raw evidence, and prepare a defensible responder deliverable. Detailed
+output semantics and investigative pivots use progressive references under
+[`skills/tracequarry/references/`](skills/tracequarry/references/), while
+[`agents/openai.yaml`](skills/tracequarry/agents/openai.yaml)
+provides the branded Codex skill metadata.
+
+### Install In Codex
+
+From a trusted local clone, expose the repository as a global Codex skill:
+
+```bash
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+ln -s "$PWD/skills/tracequarry" \
+  "${CODEX_HOME:-$HOME/.codex}/skills/tracequarry"
+```
+
+Alternatively, agents supported by the community `skills` CLI can install it
+directly from GitHub:
+
+```bash
+npx --yes skills@latest add Chill-Ethical-People/TraceQuarry \
+  --global --agent codex --skill tracequarry --yes
+```
+
+Install TraceQuarry's Python environment separately as described below, start a
+new agent session, and invoke the skill as `$tracequarry`. This command runs the
+community `skills` installer through `npx`; TraceQuarry does not require or
+publish a separate npm package.
+
+### Install In ChatGPT
+
+Download `tracequarry-skill.zip` from a TraceQuarry GitHub release. In ChatGPT,
+open **Plugins**, select the **Skills** tab, choose **Create**, then **Upload from
+your computer**. See OpenAI's [Skills in ChatGPT guide](https://help.openai.com/en/articles/20001066-skills-in-chatgpt)
+for current availability and workspace controls. Workspace administrators can
+instead share or publish the skill through the workspace Skills library.
+
+Review community skills before enabling them, keep installations updated through
+normal source-control or workspace review, and never place case evidence inside
+the skill or repository directory. OpenAI Skills follow the portable
+[Agent Skills format](https://agentskills.io), but installation locations and
+workspace permissions vary by product.
+
 ## Evidence Handling
 
 Recommended responder handling:
@@ -101,7 +150,9 @@ encrypted volume when the collection contains sensitive material.
 
 ```bash
 cd tracequarry
-python3 -m uac_parser.web --host 127.0.0.1 --port 8765 --work-dir web_runs
+python3 -m uac_parser.web --host 127.0.0.1 --port 8765 \
+  --work-dir web_runs \
+  --input-root /cases
 ```
 
 Open `http://127.0.0.1:8765`, choose either **Archive upload** or **Server
@@ -173,14 +224,16 @@ UTC.
 - Confirm the normalized UTC output against known business events, EDR alerts,
   firewall logs, VPN logs, or SIEM data.
 
-Known caveat: rotated files with filenames that embed an older year can still
-contain yearless log lines. If `--year 2026` is applied to a rotated file such as
-`yum.log-20230101`, the parser may surface apparent future or shifted dates.
-Review `source_index.json`, rotated filenames, and raw source lines before
-finalizing the incident window.
+For chronological syslog-style files that cross December into January,
+TraceQuarry detects the rollover and assigns the pre-rollover records to the
+previous year. The selected `--year` remains the anchor year after rollover.
+Explicit dates embedded only in filenames are not treated as event timestamps;
+review rotated filenames and raw records before finalizing the incident window.
 
 State artifacts without native timestamps may receive `correlated_*` timestamps
-when bodyfile or auditd PATH records support timeline placement.
+when bodyfile or auditd PATH records support timeline placement. Untimestamped
+state is retained with an acquisition observation interval when a UAC collection
+timestamp can be derived from the input name.
 
 ## Output Review Order
 
@@ -190,9 +243,11 @@ For incident response, review outputs in this order:
    Confirm that critical sources did not fail to parse. An empty file is ideal.
 
 2. `source_index.json`
-   Check evidence coverage. Confirm whether auth logs, audit logs, shell history,
-   login history, process state, network state, account files, sudoers, cron,
-   systemd, PAM, SSH keys, and bodyfile data were present.
+   Check the complete evidence inventory and parser coverage. Every non-metadata
+   file is hashed and marked parsed, partially parsed, unsupported, unmatched,
+   or failed. Confirm whether auth logs, audit logs, shell history, login history,
+   process state, network state, account files, sudoers, cron, systemd, PAM, SSH
+   keys, and bodyfile data were present.
 
 3. `summary.md`
    Read the responder summary for high-level findings, lateral movement notes,
@@ -229,10 +284,12 @@ TraceQuarry writes the following files into the selected output directory:
 - `findings.json`: correlated detections and storylines
 - `ioc_hits.json` and `ioc_hits.csv`: IoC matches when IoCs are supplied
 - `summary.md`: human-readable investigation summary
-- `source_index.json`: discovered evidence sources and parse coverage
+- `source_index.json`: complete evidence inventory, source hashes, parser status,
+  unsupported formats, unmatched files, input verification, and parse coverage
 - `parser_errors.log`: non-fatal parser errors for analyst review
 - `run_manifest.json`: input identity, source hashes, parser coverage, rule fingerprint,
-  execution settings, and output hashes for reproducibility
+  complete-collection fingerprint, input integrity verification, execution
+  settings, and output hashes for reproducibility
 - `assisted_investigation.md` and `.json`: hypothesis-led priorities, readiness,
   checklist status, evidence references, guardrails, and analyst pivots when a
   threat profile was selected
@@ -326,9 +383,15 @@ dedicated analysis workstation without removing the disk safety margin:
 
 ```bash
 python3 -m uac_parser.web --host 127.0.0.1 --port 8765 --work-dir web_runs \
+  --input-root /cases \
   --max-upload-gib 8 --max-work-dir-gib 40 \
   --max-concurrent-jobs 2 --request-timeout 120
 ```
+
+Server-side paths are accepted only beneath an allowed evidence root. Repeat
+`--input-root` to approve multiple roots; when omitted, TraceQuarry allows only
+the directory from which the GUI was launched. Browser uploads remain isolated
+under the configured work directory.
 
 Open `http://127.0.0.1:8765`, then:
 
@@ -358,22 +421,28 @@ case from its filesystem output directory.
 
 Current coverage is tuned for Linux intrusion triage:
 
+- Evidence handling: plain text plus gzip, bzip2, and xz compressed rotations;
+  native systemd journal and wtmp/btmp/lastlog databases remain inventoried as
+  explicit unsupported sources instead of disappearing from coverage
+
 - Authentication: SSH brute force, invalid users, successful login after repeated
   failures, root logins, login-history exports, account lock/unlock events, and
   password changes
 - Execution: shell history commands, download-execute chains, staged execution
   from `/tmp`, `/var/tmp`, `/dev/shm`, and `/run`, reverse-shell-like syntax, and
   process-list signals
-- Persistence: cron, systemd, rc.local, init.d, shell profiles, unrestricted SSH
-  authorized keys, LD_PRELOAD, and PAM backdoor candidates
+- Persistence: cron, systemd, journalctl text exports, rc.local, init.d, shell
+  profiles, SSH authorized-key state, LD_PRELOAD, and PAM backdoor candidates
 - Privilege escalation: UID 0 anomalies, sudoers risks, NOPASSWD entries,
   privileged group membership, SUID/SGID files, Linux capabilities, Docker/LXD
   group risk, and account backup diffing
-- Credential access: SSH key access, credential file access, local password hash
-  metadata, weak hash identification, plaintext password leakage in history, and
-  shadow timestamp extraction
-- Lateral movement: outbound SSH, SCP, rsync, known_hosts, network probes, and
-  explicit negative findings when no evidence is found
+- Credential access: SSH key access, credential file access, weak hash
+  identification, plaintext password leakage in history, and shadow timestamp
+  extraction. Normal local-password-hash presence is retained as state, not
+  reported as credential dumping.
+- Lateral movement: outbound SSH, SCP, rsync, network probes, and explicit
+  negative findings when coverage is sufficient. `known_hosts` remains historical
+  context and does not establish lateral movement.
 - Exfiltration and tooling: `rclone`, cloud CLIs, archive utilities, database
   dumps, tunneling tools, miners, destructive commands, and ransomware-impact
   indicators
@@ -383,6 +452,12 @@ Current coverage is tuned for Linux intrusion triage:
 
 Actor-relevant matches are tradecraft hints only. Do not report them as
 attribution without independent threat intelligence.
+
+Timeline schema `1.1` separates `evidence_role` (`behavior`,
+`state_observation`, `context`, or `inference`), confirmed behavioral `mitre`
+mappings, and `mitre_candidates` that still require corroboration. Events also
+retain source SHA-256, parser version, timestamp precision/confidence, and
+observation intervals for integration with enterprise timeline platforms.
 
 Tool, TTP, malware/payload metadata, and non-attributive actor-similarity
 profiles are consolidated in `rules/tagging_registry.yml`. Tool and TTP rules

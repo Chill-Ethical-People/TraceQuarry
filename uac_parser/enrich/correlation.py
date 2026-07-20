@@ -45,6 +45,11 @@ def correlate_state_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
         event.timestamp = best.timestamp
         event.timestamp_raw = best.timestamp_raw
         event.timestamp_type = f"correlated_{best.timestamp_type}"
+        event.timestamp_precision = best.timestamp_precision
+        event.timestamp_confidence = "low"
+        event.evidence_role = "inference"
+        event.time_start = best.timestamp
+        event.time_end = event.time_end or best.timestamp
         event.timezone = best.timezone
         event.timezone_confidence = "correlated"
         event.confidence = _lower_confidence(event.confidence)

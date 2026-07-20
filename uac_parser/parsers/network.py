@@ -60,34 +60,58 @@ WELL_KNOWN_OUTBOUND = {
 
 
 def parse_ss(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
-    events = []
+    rows = []
     for raw in read_text_lines(path):
         match = SS_RE.match(raw)
         if not match:
             continue
-        state = match.group("state")
-        local = match.group("local").strip("[]")
-        lport = match.group("lport")
-        peer = match.group("peer").strip("[]")
-        pport = match.group("pport")
-        procs_raw = match.group("procs") or ""
-
-        proc_name, pid = _extract_proc(procs_raw)
-
-        if peer in {"*", "0.0.0.0", "::", "[::]"} or state == "LISTEN":
+        proc_name, pid = _extract_proc(match.group("procs") or "")
+        rows.append(
+            {
+                "state": match.group("state"),
+                "local": match.group("local").strip("[]"),
+                "lport": match.group("lport"),
+                "peer": match.group("peer").strip("[]"),
+                "pport": match.group("pport"),
+                "process": proc_name,
+                "pid": pid,
+                "raw": raw,
+            }
+        )
+    listeners = _listener_endpoints(rows)
+    events = []
+    for row in rows:
+        if _is_listener_row(row):
             event = _listening_event(
-                local, lport, proc_name, pid, state, raw, relative, host
+                row["local"],
+                row["lport"],
+                row["process"],
+                row["pid"],
+                row["state"],
+                row["raw"],
+                relative,
+                host,
             )
         else:
             event = _connection_event(
-                local, lport, peer, pport, proc_name, pid, state, raw, relative, host
+                row["local"],
+                row["lport"],
+                row["peer"],
+                row["pport"],
+                row["process"],
+                row["pid"],
+                row["state"],
+                row["raw"],
+                relative,
+                host,
+                listeners,
             )
         events.append(event)
     return events
 
 
 def parse_netstat(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
-    events = []
+    rows = []
     for raw in read_text_lines(path):
         match = NETSTAT_RE.match(raw)
         if not match:
@@ -105,16 +129,56 @@ def parse_netstat(path: Path, relative: str, host: str = "") -> list[TimelineEve
             pid = proc_match.group(1)
             proc_name = proc_match.group(2)
 
-        if peer in {"*", "0.0.0.0", "::", "[::]"} or state == "LISTEN":
+        rows.append(
+            {
+                "state": state,
+                "local": local,
+                "lport": lport,
+                "peer": peer,
+                "pport": pport,
+                "process": proc_name,
+                "pid": pid,
+                "raw": raw,
+            }
+        )
+    listeners = _listener_endpoints(rows)
+    events = []
+    for row in rows:
+        if _is_listener_row(row):
             event = _listening_event(
-                local, lport, proc_name, pid, state, raw, relative, host
+                row["local"],
+                row["lport"],
+                row["process"],
+                row["pid"],
+                row["state"],
+                row["raw"],
+                relative,
+                host,
             )
         else:
             event = _connection_event(
-                local, lport, peer, pport, proc_name, pid, state, raw, relative, host
+                row["local"],
+                row["lport"],
+                row["peer"],
+                row["pport"],
+                row["process"],
+                row["pid"],
+                row["state"],
+                row["raw"],
+                relative,
+                host,
+                listeners,
             )
         events.append(event)
     return events
+
+
+def _is_listener_row(row: dict[str, str]) -> bool:
+    return row["peer"] in {"*", "0.0.0.0", "::", "[::]"} or row["state"] == "LISTEN"
+
+
+def _listener_endpoints(rows: list[dict[str, str]]) -> set[tuple[str, str]]:
+    return {(row["local"], row["lport"]) for row in rows if _is_listener_row(row)}
 
 
 def _extract_proc(procs_raw: str) -> tuple[str, str]:
@@ -168,6 +232,7 @@ def _listening_event(
     return TimelineEvent(
         timestamp="",
         timestamp_type="state_observed",
+        evidence_role="state_observation",
         timezone_confidence="missing",
         host=host,
         source_path=relative,
@@ -183,7 +248,7 @@ def _listening_event(
         tags=["network", "listening"],
         detection_names=detections,
         ttp_flags=detections,
-        mitre=["T1571"] if severity == "high" else [],
+        mitre_candidates=["T1571"] if severity == "high" else [],
         summary=f"Listening on {local}:{lport}"
         + (f" ({proc_name})" if proc_name else ""),
         raw=raw,
@@ -202,14 +267,17 @@ def _connection_event(
     raw: str,
     relative: str,
     host: str,
+    listeners: set[tuple[str, str]],
 ) -> TimelineEvent:
     detections = ["active_connection"]
     severity = "informational"
     tags = ["network", "connection"]
     mitre: list[str] = []
 
-    is_outbound = not _is_listening_port(lport)
-    direction = "outbound" if is_outbound else "inbound"
+    direction, direction_confidence, direction_reason = _connection_direction(
+        local, lport, peer, pport, proc_name, listeners
+    )
+    is_outbound = direction == "outbound"
     tags.append(direction)
 
     if is_outbound:
@@ -230,49 +298,95 @@ def _connection_event(
     if state in {"ESTAB", "ESTABLISHED"}:
         detections.append("established_connection")
 
-    src_ip = local if is_outbound else peer
-    dst_ip = peer if is_outbound else local
+    src_ip = local if is_outbound else peer if direction == "inbound" else None
+    dst_ip = peer if is_outbound else local if direction == "inbound" else None
+    event_action = (
+        f"{direction}_connection"
+        if direction in {"inbound", "outbound"}
+        else "connection_observed"
+    )
 
     return TimelineEvent(
         timestamp="",
         timestamp_type="state_observed",
+        evidence_role="state_observation",
         timezone_confidence="missing",
         host=host,
         source_path=relative,
         source_type="network_state",
         parser="network",
         event_category="network",
-        event_action=f"{direction}_connection",
+        event_action=event_action,
         src_ip=src_ip,
         dst_ip=dst_ip,
         port=pport if is_outbound else lport,
         process=proc_name or None,
         pid=pid or None,
         severity=severity,
-        confidence="medium",
+        confidence=direction_confidence,
         tags=tags,
         detection_names=detections,
         ttp_flags=detections,
-        mitre=mitre,
+        mitre_candidates=mitre,
         summary=f"{direction.title()} {state} {local}:{lport} -> {peer}:{pport}"
         + (f" ({proc_name})" if proc_name else ""),
         raw=raw,
-        extra={"state": state, "direction": direction},
+        extra={
+            "state": state,
+            "direction": direction,
+            "direction_confidence": direction_confidence,
+            "direction_reason": direction_reason,
+            "local_endpoint": f"{local}:{lport}",
+            "peer_endpoint": f"{peer}:{pport}",
+        },
     )
 
 
-def _is_listening_port(port: str) -> bool:
+def _connection_direction(
+    local: str,
+    lport: str,
+    peer: str,
+    pport: str,
+    proc_name: str,
+    listeners: set[tuple[str, str]],
+) -> tuple[str, str, str]:
+    if (local, lport) in listeners or any(
+        listener_port == lport and listener_addr in {"0.0.0.0", "::", "*"}
+        for listener_addr, listener_port in listeners
+    ):
+        return "inbound", "high", "local endpoint matches an observed listener"
+    process = proc_name.lower()
+    if process in {
+        "sshd",
+        "nginx",
+        "apache2",
+        "httpd",
+        "mysqld",
+        "postgres",
+        "redis-server",
+    }:
+        return "inbound", "medium", f"{proc_name} is acting as a server process"
+    if process in {
+        "ssh",
+        "scp",
+        "sftp",
+        "curl",
+        "wget",
+        "rclone",
+        "nc",
+        "ncat",
+        "socat",
+    }:
+        return "outbound", "medium", f"{proc_name} is acting as a client process"
     try:
-        return int(port) < 1024 or int(port) in {
-            4505,
-            4506,
-            8080,
-            8443,
-            3306,
-            5432,
-            6379,
-            9090,
-            27017,
-        }
+        local_port = int(lport)
+        peer_port = int(pport)
     except ValueError:
-        return False
+        return "unknown", "low", "socket endpoints do not establish direction"
+    if local_port >= 32768 and (peer_port < 1024 or pport in SUSPICIOUS_OUTBOUND_PORTS):
+        return "outbound", "medium", "ephemeral local port connects to remote service"
+    return (
+        "unknown",
+        "low",
+        "no listener or process-role evidence establishes direction",
+    )

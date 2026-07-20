@@ -37,6 +37,8 @@ jobs:
           output-file: dist/tracequarry-${{ github.ref_name }}.cdx.json
           upload-artifact: false
           upload-release-assets: false
+      - name: Package Agent Skill
+        run: python tools/package_agent_skill.py --output dist/tracequarry-skill.zip
       - name: Generate checksums
         working-directory: dist
         run: sha256sum tracequarry-* > SHA256SUMS

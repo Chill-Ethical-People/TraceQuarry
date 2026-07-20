@@ -11,6 +11,7 @@ from uac_parser.web import (
     JOBS,
     JOBS_LOCK,
     SERVER_CONFIG,
+    _input_paths_from_form,
     _is_loopback_authority,
     _is_loopback_origin,
     _save_annotation,
@@ -21,6 +22,33 @@ from uac_parser.web import (
 
 
 class WebTests(unittest.TestCase):
+    def test_server_side_inputs_are_limited_to_allowed_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            allowed = root / "evidence"
+            allowed.mkdir()
+            collection = allowed / "host01"
+            collection.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            escape = allowed / "escape"
+            escape.symlink_to(outside, target_is_directory=True)
+            upload_dir = root / "uploads"
+            upload_dir.mkdir()
+            SERVER_CONFIG["input_roots"] = (allowed.resolve(),)
+
+            try:
+                paths = _input_paths_from_form(
+                    {"input_path": str(collection)}, [], upload_dir
+                )
+                self.assertEqual(paths, [str(collection.resolve())])
+                with self.assertRaisesRegex(ValueError, "outside the allowed roots"):
+                    _input_paths_from_form({"input_path": str(outside)}, [], upload_dir)
+                with self.assertRaisesRegex(ValueError, "outside the allowed roots"):
+                    _input_paths_from_form({"input_path": str(escape)}, [], upload_dir)
+            finally:
+                SERVER_CONFIG.pop("input_roots", None)
+
     def test_inspected_window_preserves_seconds(self) -> None:
         value = _utc_iso_to_local_value("2026-06-16T10:01:40Z", "Asia/Hong_Kong")
 
@@ -37,6 +65,7 @@ class WebTests(unittest.TestCase):
         self.assertIn("/assets/cep-mark.svg", page)
         self.assertNotIn("cep-lockup.svg", page)
         self.assertIn("X-TraceQuarry-CSRF", page)
+        self.assertIn("--input-root", page)
         self.assertNotIn("fonts.googleapis.com", page)
 
     def test_loopback_authority_and_origin_validation(self) -> None:

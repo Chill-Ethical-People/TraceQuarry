@@ -1,7 +1,7 @@
 import unittest
 from datetime import UTC, datetime, timedelta
 
-from uac_parser.enrich.ttp_rules import derive_findings
+from uac_parser.enrich.ttp_rules import derive_findings, enrich_events
 from uac_parser.parsers.auth import parse as parse_auth
 from uac_parser.timeline.event import TimelineEvent
 
@@ -19,6 +19,26 @@ def _ssh(action: str, when: datetime) -> TimelineEvent:
 
 
 class FindingTests(unittest.TestCase):
+    def test_state_inventory_does_not_claim_credential_access_behavior(self) -> None:
+        state = TimelineEvent(
+            source_type="shadow",
+            file_path="/etc/shadow",
+            event_action="password_state_observed",
+            evidence_role="state_observation",
+        )
+        behavior = TimelineEvent(
+            source_type="shell_history",
+            command="cat /etc/shadow",
+            event_action="shell_command",
+            event_category="execution",
+            evidence_role="behavior",
+        )
+
+        enrich_events([state, behavior])
+
+        self.assertNotIn("credential_material_access", state.detection_names)
+        self.assertIn("credential_material_access", behavior.detection_names)
+
     def test_auth_user_creation_preserves_full_username(self) -> None:
         import tempfile
         from pathlib import Path

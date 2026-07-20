@@ -29,6 +29,8 @@ latest public branch unless maintainers state otherwise.
 
 - The web GUI binds only to `127.0.0.1`, `localhost`, or `::1`. Direct remote
   binding is refused, including the legacy `--allow-remote` option.
+- Server-side evidence paths must resolve beneath an explicitly allowed
+  `--input-root`; symbolic-link escapes and paths outside those roots are refused.
 - Use an authenticated SSH tunnel when remote analyst access is required. Do not
   publish the GUI through an unauthenticated reverse proxy.
 - State-changing browser requests require a per-process token and loopback Host

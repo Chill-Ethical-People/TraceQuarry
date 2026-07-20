@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -14,6 +14,17 @@ class SourceFile:
     parser_status: str = "discovered"
     event_count: int = 0
     parser_error: str = ""
+
+
+@dataclass
+class EvidenceFile:
+    path: Path
+    relative: str
+    size: int
+    sha256: str = ""
+    source_types: list[str] = field(default_factory=list)
+    coverage_status: str = "unmatched"
+    coverage_reason: str = "No TraceQuarry source pattern matched this file."
 
 
 PATTERNS = {
@@ -38,7 +49,14 @@ PATTERNS = {
         "*dnf.log*",
         "*zypper.log*",
     ),
-    "systemd": ("*systemctl*", "*journal*"),
+    "systemd": ("*systemctl*",),
+    "journal_text": (
+        "*journalctl*",
+        "*journal*.txt",
+        "*journal*.log",
+        "*journal*.out",
+    ),
+    "journal_binary": ("*.journal", "*.journal~"),
     "systemd_unit": (
         "etc/systemd/system/*.service",
         "etc/systemd/system/*.timer",
@@ -54,6 +72,7 @@ PATTERNS = {
         "*wtmp.txt",
         "*btmp.txt",
     ),
+    "login_binary": ("var/log/wtmp", "var/log/btmp", "var/log/lastlog"),
     "passwd": ("etc/passwd",),
     "shadow": ("etc/shadow",),
     "group": ("etc/group",),
@@ -88,7 +107,7 @@ def discover_sources(root: Path) -> list[SourceFile]:
                 rel = path.relative_to(root).as_posix()
                 if _ignored_artifact(rel):
                     continue
-                if path.is_file() and path.stat().st_size < 200 * 1024 * 1024:
+                if path.is_file():
                     if not _valid_source(source_type, rel):
                         continue
                     sources.append(
@@ -108,6 +127,38 @@ def discover_sources(root: Path) -> list[SourceFile]:
         seen.add(key)
         unique.append(source)
     return unique
+
+
+def discover_evidence_files(
+    root: Path, sources: list[SourceFile]
+) -> list[EvidenceFile]:
+    """Inventory every non-metadata file, including unsupported parser inputs."""
+    source_types: dict[str, set[str]] = {}
+    for source in sources:
+        source_types.setdefault(source.relative, set()).add(source.source_type)
+    evidence = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root).as_posix()
+        if _ignored_artifact(relative):
+            continue
+        matched = sorted(source_types.get(relative, set()))
+        evidence.append(
+            EvidenceFile(
+                path=path,
+                relative=relative,
+                size=path.stat().st_size,
+                source_types=matched,
+                coverage_status="recognized" if matched else "unmatched",
+                coverage_reason=(
+                    "Matched one or more TraceQuarry source patterns."
+                    if matched
+                    else "No TraceQuarry source pattern matched this file."
+                ),
+            )
+        )
+    return sorted(evidence, key=lambda item: item.relative)
 
 
 def discover_exclusions(root: Path) -> list[dict[str, str]]:
@@ -142,7 +193,11 @@ def _valid_source(source_type: str, relative: str) -> bool:
     if source_type == "capabilities":
         return "cap" in name.lower() or "getcap" in name.lower()
     if source_type == "systemd":
-        return "systemctl" in name.lower() or "journal" in name.lower()
+        return "systemctl" in name.lower()
+    if source_type == "journal_text":
+        return "journal" in name.lower() and not name.endswith(
+            (".journal", ".journal~")
+        )
     if source_type == "ss_output":
         return "ss_" in name.lower() or "ss-" in name.lower()
     if source_type == "netstat_output":

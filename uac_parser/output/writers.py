@@ -9,20 +9,28 @@ from uac_parser.output.permissions import secure_file
 from uac_parser.timeline.event import TimelineEvent
 
 CSV_FIELDS = [
+    "schema_version",
     "event_id",
     "timestamp",
     "timestamp_raw",
+    "time_start",
+    "time_end",
     "timezone",
     "timezone_confidence",
     "timestamp_type",
+    "timestamp_precision",
+    "timestamp_confidence",
+    "evidence_role",
     "host",
     "collection_id",
     "collection_name",
     "collection_input",
     "collection_host",
     "source_path",
+    "source_sha256",
     "source_type",
     "parser",
+    "parser_version",
     "event_category",
     "event_action",
     "user",
@@ -38,6 +46,7 @@ CSV_FIELDS = [
     "severity",
     "confidence",
     "mitre",
+    "mitre_candidates",
     "detection_names",
     "ttp_flags",
     "tags",
@@ -64,6 +73,7 @@ def write_csv(path: Path, events: list[TimelineEvent]) -> None:
         for event in events:
             row = event.to_dict()
             row["mitre"] = ",".join(event.mitre)
+            row["mitre_candidates"] = ",".join(event.mitre_candidates)
             row["detection_names"] = ",".join(event.detection_names)
             row["ttp_flags"] = ",".join(event.ttp_flags)
             row["tags"] = ",".join(event.tags)
@@ -85,12 +95,16 @@ def write_summary(
     events: list[TimelineEvent],
     findings: list[dict[str, Any]],
     storylines: list[dict[str, Any]],
+    *,
+    context_events: list[TimelineEvent] | None = None,
 ) -> None:
+    all_context = context_events if context_events is not None else events
     high = [f for f in findings if f.get("severity") == "high"]
     lines = [
         "# TraceQuarry Summary",
         "",
-        f"Total events: {len(events)}",
+        f"Events in review scope: {len(events)}",
+        f"Total parsed events: {len(all_context)}",
         f"Findings: {len(findings)}",
         f"High severity findings: {len(high)}",
         f"Storylines: {len(storylines)}",
@@ -120,7 +134,7 @@ def write_summary(
     acct_findings = [
         f for f in findings if "account_lifecycle" in (f.get("tags") or [])
     ]
-    acct_events = [e for e in events if e.source_type == "account_diff"]
+    acct_events = [e for e in all_context if e.source_type == "account_diff"]
     if acct_findings:
         for f in acct_findings:
             lines.append(f"- {f.get('summary')}")
@@ -165,14 +179,19 @@ def write_summary(
         lines.append("- No brute-force campaigns detected.")
 
     lines.extend(["", "## Network State"])
-    net_events = [e for e in events if e.source_type == "network_state"]
+    net_events = [e for e in all_context if e.source_type == "network_state"]
     listening = [e for e in net_events if e.event_action == "listening_port"]
     outbound = [e for e in net_events if "outbound" in e.event_action]
     inbound = [e for e in net_events if "inbound" in e.event_action]
     if net_events:
+        untimed = sum(not event.timestamp for event in net_events)
         lines.append(
             f"- {len(listening)} listening port(s), {len(inbound)} inbound connection(s), {len(outbound)} outbound connection(s)"
         )
+        if untimed:
+            lines.append(
+                f"  - {untimed} network snapshot event(s) have no point-in-time timestamp and are reported as collection state."
+            )
         suspicious_net = [
             e for e in net_events if e.severity in {"medium", "high", "critical"}
         ]

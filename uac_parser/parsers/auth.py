@@ -6,7 +6,7 @@ from pathlib import Path
 from uac_parser.timeline.event import TimelineEvent
 from uac_parser.timeline.timestamp import parse_syslog
 
-from .common import read_text_lines
+from .common import read_syslog_lines
 
 PROC_RE = re.compile(
     r"^\w{3}\s+\d+\s+\d\d:\d\d:\d\d\s+(?P<host>\S+)\s+(?P<proc>[\w./-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<msg>.*)$"
@@ -50,8 +50,8 @@ def parse(
     timezone_name: str = "UTC",
 ) -> list[TimelineEvent]:
     events: list[TimelineEvent] = []
-    for raw in read_text_lines(path):
-        timestamp = parse_syslog(raw, year=year, timezone_name=timezone_name)
+    for raw, resolved_year in read_syslog_lines(path, year):
+        timestamp = parse_syslog(raw, year=resolved_year, timezone_name=timezone_name)
         if not timestamp:
             continue
         match = PROC_RE.match(raw)

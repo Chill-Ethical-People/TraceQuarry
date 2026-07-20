@@ -42,6 +42,9 @@ class AccountParserTests(unittest.TestCase):
         self.assertIn("interactive_shell_for_system_account", daemon.detection_names)
         self.assertEqual(legacy.extra["hash_type"], "MD5")
         self.assertEqual(legacy.raw, "[shadow hash redacted]")
+        self.assertEqual(legacy.evidence_role, "state_observation")
+        self.assertEqual(legacy.mitre, [])
+        self.assertNotIn("local_password_hash_present", legacy.detection_names)
         self.assertEqual(locked.extra["hash_type"], "locked_or_disabled")
         self.assertEqual(docker.severity, "high")
 

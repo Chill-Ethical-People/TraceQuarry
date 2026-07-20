@@ -58,6 +58,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default="web_runs",
         help="Directory for uploaded inputs and parser outputs",
     )
+    parser.add_argument(
+        "--input-root",
+        action="append",
+        default=[],
+        help=(
+            "Allowed root for server-side evidence paths. Repeat for multiple roots; "
+            "defaults to the current directory."
+        ),
+    )
     parser.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--max-upload-gib",
@@ -107,12 +116,22 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Request timeout must be at least five seconds.")
     os.umask(0o077)
     work_dir = Path(args.work_dir).expanduser().resolve()
+    raw_input_roots = args.input_root or [str(Path.cwd())]
+    try:
+        input_roots = tuple(
+            Path(value).expanduser().resolve(strict=True) for value in raw_input_roots
+        )
+    except OSError as exc:
+        raise SystemExit(f"Unable to resolve an input root: {exc}") from exc
+    if any(not root.is_dir() for root in input_roots):
+        raise SystemExit("Every --input-root must be an existing directory.")
     _secure_directory(work_dir)
     _secure_directory(work_dir / "uploads")
     _secure_directory(work_dir / "outputs")
     SERVER_CONFIG.update(
         {
             "work_dir": work_dir,
+            "input_roots": input_roots,
             "max_request_bytes": int(args.max_upload_gib * 1024**3),
             "max_work_bytes": int(args.max_work_dir_gib * 1024**3),
             "request_timeout": args.request_timeout,
@@ -123,6 +142,9 @@ def main(argv: list[str] | None = None) -> int:
     server = HardenedThreadingHTTPServer((args.host, args.port), UacWebHandler)
     print(f"TraceQuarry GUI listening on http://{args.host}:{args.port}")
     print(f"Work directory: {work_dir}")
+    print("Allowed input roots:")
+    for input_root in input_roots:
+        print(f"  - {input_root}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -143,6 +165,36 @@ def _work_dir() -> Path:
     if not isinstance(value, Path):
         raise RuntimeError("TraceQuarry work directory is not configured.")
     return value
+
+
+def _input_roots() -> tuple[Path, ...]:
+    value = SERVER_CONFIG.get("input_roots")
+    if (
+        isinstance(value, tuple)
+        and value
+        and all(isinstance(root, Path) for root in value)
+    ):
+        return value
+    return (Path.cwd().resolve(),)
+
+
+def _resolve_server_input(raw_path: str) -> Path:
+    try:
+        candidate = Path(raw_path).expanduser().resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ValueError(
+            "Server-side input does not exist or cannot be resolved."
+        ) from exc
+    if not any(
+        candidate == root or candidate.is_relative_to(root) for root in _input_roots()
+    ):
+        raise ValueError(
+            "Server-side input is outside the allowed roots. Restart TraceQuarry "
+            "with --input-root for the evidence directory."
+        )
+    if not candidate.is_file() and not candidate.is_dir():
+        raise ValueError("Server-side input must be a regular file or directory.")
+    return candidate
 
 
 def _secure_directory(path: Path) -> None:
@@ -576,14 +628,14 @@ class UacWebHandler(BaseHTTPRequestHandler):
         content_type = (
             mimetypes.guess_type(str(target))[0] or "application/octet-stream"
         )
+        content = target.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(target.stat().st_size))
+        self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", "no-store, max-age=0")
         self.send_header("Pragma", "no-cache")
         self.end_headers()
-        with target.open("rb") as handle:
-            shutil.copyfileobj(handle, self.wfile)
+        self.wfile.write(content)
 
     def _send_html(self, body: str, status: int = 200) -> None:
         encoded = body.encode("utf-8")
@@ -700,7 +752,7 @@ def _input_paths_from_form(
     for raw_line in fields.get("input_path", "").splitlines():
         line = raw_line.strip()
         if line:
-            input_paths.append(line)
+            input_paths.append(str(_resolve_server_input(line)))
     for uploaded_file in uploaded_files:
         input_paths.append(str(_save_upload(uploaded_file, upload_dir)))
     seen = set()
@@ -743,6 +795,9 @@ def _inspect_inputs(
         "events": sum(result.events for result in results),
         "timed_events": timed_events,
         "excluded_files": sum(result.excluded_files for result in results),
+        "evidence_files": sum(result.evidence_files for result in results),
+        "unsupported_sources": sum(result.unsupported_sources for result in results),
+        "unmatched_files": sum(result.unmatched_files for result in results),
         "log_events": log_events,
         "sources": sum(result.sources for result in results),
         "errors": sum(result.errors for result in results),
@@ -2368,7 +2423,7 @@ def render_index(csrf_token: str = CSRF_TOKEN) -> str:
         <div class="field-panel" id="path-panel" hidden>
           <label for="input_path">Server-side input path</label>
           <textarea id="input_path" name="input_path" placeholder="/cases/uac-host01.tar.gz&#10;/cases/uac-host02.tar.gz"></textarea>
-          <div class="hint">One archive or extracted UAC directory per line. Multiple paths create a case workspace.</div>
+          <div class="hint">One archive or extracted UAC directory per line. Paths must be beneath a configured <code>--input-root</code>. Multiple paths create a case workspace.</div>
         </div>
 
         <label for="case_name">Case name</label>
@@ -3136,7 +3191,8 @@ def render_index(csrf_token: str = CSRF_TOKEN) -> str:
       const basis = data.range_basis === 'log_time' ? `${{Number(data.log_events || 0).toLocaleString()}} log-time events` : `${{Number(data.timed_events || 0).toLocaleString()}} timestamped events`;
       const collectionText = data.collections && data.collections > 1 ? ` across ${{Number(data.collections).toLocaleString()}} collections` : '';
       const exclusionText = data.excluded_files ? ` ${{Number(data.excluded_files).toLocaleString()}} non-evidence metadata file(s) excluded and recorded.` : '';
-      rangeSummary.textContent = `${{basis}} across ${{Number(data.sources || 0).toLocaleString()}} sources${{collectionText}}. Window filled in ${{data.timezone || 'UTC'}}.${{exclusionText}}`;
+      const evidenceText = data.evidence_files ? ` ${{Number(data.evidence_files).toLocaleString()}} evidence file(s) inventoried; ${{Number(data.unsupported_sources || 0).toLocaleString()}} unsupported source view(s) and ${{Number(data.unmatched_files || 0).toLocaleString()}} unmatched file(s).` : '';
+      rangeSummary.textContent = `${{basis}} across ${{Number(data.sources || 0).toLocaleString()}} sources${{collectionText}}. Window filled in ${{data.timezone || 'UTC'}}.${{evidenceText}}${{exclusionText}}`;
       rangeEarliest.textContent = data.earliest_display || data.earliest;
       rangeLatest.textContent = data.latest_display || data.latest;
       renderCoverageReadiness(data.source_types || []);

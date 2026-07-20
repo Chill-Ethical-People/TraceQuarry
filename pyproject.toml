@@ -85,7 +85,7 @@ include = ["uac_parser*"]
 
 [tool.setuptools.data-files]
 "share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/investigation_profiles.yml", "rules/README.md"]
-"share/tracequarry/assets" = ["assets/cep-mark.svg", "assets/tracequarry-favicon.svg", "assets/tracequarry-lockup.svg", "assets/tracequarry-mark.svg", "assets/tracequarry-platform-icon.svg"]
+"share/tracequarry/assets" = ["assets/cep-mark.svg", "assets/tracequarry-favicon.svg", "assets/tracequarry-lockup.svg"]
 
 [build-system]
 requires = ["setuptools>=77"]

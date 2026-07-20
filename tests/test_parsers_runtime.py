@@ -59,7 +59,8 @@ class RuntimeParserTests(unittest.TestCase):
         )
         self.assertEqual(listener.severity, "high")
         self.assertEqual(listener.process, "nc")
-        self.assertEqual(outbound_ssh.mitre, ["T1021.004"])
+        self.assertEqual(outbound_ssh.mitre_candidates, ["T1021.004"])
+        self.assertEqual(outbound_ssh.evidence_role, "state_observation")
         self.assertEqual(inbound.src_ip, "198.51.100.30")
         self.assertIn("c2_candidate", c2.tags)
 

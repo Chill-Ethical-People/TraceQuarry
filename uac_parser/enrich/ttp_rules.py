@@ -46,7 +46,10 @@ def _add(
     event.ttp_flags = sorted(set(event.ttp_flags + [action]))
     event.severity = _max_severity(event.severity, severity)
     event.tags = sorted(set(event.tags + tags))
-    event.mitre = sorted(set(event.mitre + mitre))
+    if event.evidence_role == "behavior":
+        event.mitre = sorted(set(event.mitre + mitre))
+    else:
+        event.mitre_candidates = sorted(set(event.mitre_candidates + mitre))
 
 
 def _max_severity(a: str, b: str) -> str:
@@ -111,7 +114,7 @@ def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
                 ["account_change", "privilege"],
                 ["T1136.001", "T1548.003"],
             )
-        if any(
+        if event.evidence_role == "behavior" and any(
             secret in text
             for secret in [
                 "/etc/shadow",
@@ -327,7 +330,7 @@ def _apply_registry_tool_tags(
             "high"
             if executed and confidence == "high"
             else "medium"
-            if confidence in {"high", "medium"}
+            if executed and confidence in {"high", "medium"}
             else "low"
         )
         tags = [
@@ -600,8 +603,8 @@ def derive_findings(
         "uid0_non_root_account",
         "container_group_privilege_risk",
         "nopasswd_sudo_rule",
+        "broad_nopasswd_sudo_rule",
         "dangerous_sudo_rule_candidate",
-        "unrestricted_authorized_key",
         "suspicious_cron_entry",
         "suspicious_systemd_execstart",
         "ld_so_preload_modified",
@@ -647,20 +650,38 @@ def derive_findings(
                 if e.event_action == action or action in e.detection_names
             ]
             severity = "medium" if action in medium_finding_actions else "high"
+            state_only = bool(matched_events) and all(
+                event.evidence_role != "behavior" for event in matched_events
+            )
+            if state_only:
+                severity = "medium"
             confidence = (
                 "high"
                 if matched_events
                 and all(e.confidence == "high" for e in matched_events)
                 else "medium"
             )
+            if state_only:
+                confidence = "low"
+            finding_tags = [action]
+            if state_only:
+                finding_tags.extend(["contextual_evidence", "requires_corroboration"])
             findings.append(
                 {
                     "title": action.replace("_", " ").title(),
                     "severity": severity,
                     "confidence": confidence,
                     "event_ids": [event.event_id for event in matched_events[:10]],
-                    "summary": f"Observed {actions[action]} event(s) matching {action}.",
-                    "tags": [action],
+                    "summary": (
+                        f"Observed {actions[action]} state or inferred event(s) matching {action}; "
+                        "this does not establish execution or attacker action without corroboration."
+                        if state_only
+                        else f"Observed {actions[action]} event(s) matching {action}."
+                    ),
+                    "tags": finding_tags,
+                    "evidence_roles": sorted(
+                        {event.evidence_role for event in matched_events}
+                    ),
                 }
             )
     findings.extend(_bruteforce_campaign_findings(events))

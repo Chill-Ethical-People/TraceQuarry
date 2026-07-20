@@ -1,0 +1,7 @@
+interface:
+  display_name: "TraceQuarry Linux DFIR"
+  short_description: "Analyze UAC evidence defensibly"
+  icon_small: "./assets/tracequarry-platform-icon.svg"
+  icon_large: "./assets/tracequarry-lockup.svg"
+  brand_color: "#0E1626"
+  default_prompt: "Use $tracequarry to analyze this Linux UAC collection, validate high-impact findings against raw evidence, and produce a defensible incident timeline."
