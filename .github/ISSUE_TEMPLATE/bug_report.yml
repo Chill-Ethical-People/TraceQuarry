@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible TraceQuarry defect without sharing sensitive evidence.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach real UAC collections, credentials, malware, or customer data. Use a minimal synthetic reproduction.
+  - type: input
+    id: version
+    attributes:
+      label: TraceQuarry version
+      placeholder: 0.4.0b1
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - CLI
+        - Web GUI
+        - Python API
+        - Packaging or installation
+        - Detection pack
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Explain the observed and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction
+      description: Provide commands and a minimal synthetic fixture or sanitized example.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include operating system, Python version, and installation method.
+    validations:
+      required: true
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Evidence hygiene
+      options:
+        - label: I confirm this report contains no private evidence, credentials, customer identifiers, or malware samples.
+          required: true
+
