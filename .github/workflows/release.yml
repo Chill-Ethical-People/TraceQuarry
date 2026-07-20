@@ -41,6 +41,15 @@ jobs:
         working-directory: dist
         run: sha256sum tracequarry-* > SHA256SUMS
       - name: Publish GitHub release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
+        run: |
+          release_flags=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --generate-notes \
+            --verify-tag \
+            "${release_flags[@]}"
