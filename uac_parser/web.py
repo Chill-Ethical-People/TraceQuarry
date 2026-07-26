@@ -944,9 +944,6 @@ class UacWebHandler(BaseHTTPRequestHandler):
             return
         self.send_response(204)
         self.send_header("Allow", "GET, POST, OPTIONS")
-        self.send_header(
-            "Access-Control-Allow-Origin", origin or f"http://127.0.0.1:{server_port}"
-        )
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers", "Content-Type, X-TraceQuarry-CSRF"
@@ -1238,7 +1235,7 @@ class UacWebHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/csv; charset=utf-8")
         self.send_header(
             "Content-Disposition",
-            f'attachment; filename="tracequarry-{job_id}-{actual_scope}-timeline.csv"',
+            'attachment; filename="tracequarry-timeline.csv"',
         )
         self.send_header("Cache-Control", "no-store, max-age=0")
         self.end_headers()
@@ -1276,7 +1273,7 @@ class UacWebHandler(BaseHTTPRequestHandler):
         temporary_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
-                prefix=f"tracequarry-{job_id}-",
+                prefix="tracequarry-export-",
                 suffix=".xlsx",
                 dir=export_dir,
                 delete=False,
@@ -1312,7 +1309,7 @@ class UacWebHandler(BaseHTTPRequestHandler):
             )
             self.send_header(
                 "Content-Disposition",
-                f'attachment; filename="tracequarry-{job_id}-investigation.xlsx"',
+                'attachment; filename="tracequarry-investigation.xlsx"',
             )
             self.send_header("Content-Length", str(temporary_path.stat().st_size))
             self.send_header("Cache-Control", "no-store, max-age=0")
@@ -2115,6 +2112,8 @@ def _list_jobs() -> list[dict[str, Any]]:
 
 
 def _job_output_dir(job_id: str) -> Path:
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        raise FileNotFoundError("Completed job not found.")
     job = _case_repository().get(job_id)
     if not job or job.get("status") != "complete":
         raise FileNotFoundError("Completed job not found.")

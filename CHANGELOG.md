@@ -110,6 +110,8 @@ All notable TraceQuarry changes are documented here. The project follows
   quota, and the browser policy no longer permits inline JavaScript.
 - Dependabot pull requests no longer fail Snyk authentication when GitHub
   withholds Actions secrets; Dependency Review remains their security gate.
+- Removed request-controlled values from CORS and download headers and from the
+  investigation workbook temporary-file prefix.
 
 ## [0.4.0-beta.1] - 2026-07-18
 

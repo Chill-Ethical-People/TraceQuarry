@@ -512,6 +512,22 @@ class WebSecurityIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(hostile_host_status, 421)
 
+    def test_options_does_not_reflect_request_origin(self) -> None:
+        allowed_origin = f"http://127.0.0.1:{self.server.server_port}"
+
+        status, headers, _ = self.request(
+            "OPTIONS", "/api/run", headers={"Origin": allowed_origin}
+        )
+        hostile_status, _, _ = self.request(
+            "OPTIONS",
+            "/api/run",
+            headers={"Origin": "https://attacker.example"},
+        )
+
+        self.assertEqual(status, 204)
+        self.assertNotIn("Access-Control-Allow-Origin", headers)
+        self.assertEqual(hostile_status, 403)
+
     def test_oversized_request_is_rejected_before_processing(self) -> None:
         APP_CONTEXT.replace_settings(max_request_bytes=4)
         status, _, body = self.request(
@@ -601,7 +617,10 @@ class WebSecurityIntegrationTests(unittest.TestCase):
         rows = list(csv.DictReader(io.StringIO(body.decode("utf-8"))))
 
         self.assertEqual(status, 200)
-        self.assertIn("attachment", headers["Content-Disposition"])
+        self.assertEqual(
+            headers["Content-Disposition"],
+            'attachment; filename="tracequarry-timeline.csv"',
+        )
         self.assertEqual(rows[0]["analyst_disposition"], "malicious")
         self.assertEqual(rows[0]["summary_selection"], "Summary")
         self.assertEqual(rows[0]["analyst_tags"], "lateral_movement")
@@ -619,7 +638,10 @@ class WebSecurityIntegrationTests(unittest.TestCase):
             "GET", f"/api/job/{job_id}/investigation.xlsx?scope=full"
         )
         self.assertEqual(workbook_status, 200)
-        self.assertIn("investigation.xlsx", workbook_headers["Content-Disposition"])
+        self.assertEqual(
+            workbook_headers["Content-Disposition"],
+            'attachment; filename="tracequarry-investigation.xlsx"',
+        )
         with zipfile.ZipFile(io.BytesIO(workbook_body)) as archive:
             workbook_xml = archive.read("xl/workbook.xml").decode("utf-8")
             self.assertIn("Executive Briefing", workbook_xml)
