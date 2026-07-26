@@ -845,17 +845,23 @@ Organization membership, repository access, or a maintainer role does not by
 itself transfer ownership of the original project. Accepted contributors retain
 copyright in their own contributions unless a separate written assignment says
 otherwise; those contributions are licensed under Apache-2.0 for inclusion in
-TraceQuarry. See `OWNERSHIP.md` for the project record.
+TraceQuarry. See [OWNERSHIP.md](OWNERSHIP.md) for the project record and
+[GOVERNANCE.md](GOVERNANCE.md) for the official project's decision rights.
 
 The license covers the software. The TraceQuarry name, logo, lockup, favicon,
 brand assets, and Chill Ethical People marks remain project identity assets and
-are not granted for unrelated branding or endorsement. See `LICENSE`, `NOTICE`,
-and `OWNERSHIP.md` for the exact terms and attribution record.
+are not granted for unrelated branding or endorsement. Public forks and
+modified distributions may truthfully describe their origin, but must not imply
+that they are an official release or endorsed project. See
+[TRADEMARKS.md](TRADEMARKS.md), [LICENSE](LICENSE), [NOTICE](NOTICE), and
+[OWNERSHIP.md](OWNERSHIP.md) for the applicable terms and attribution record.
 
-Contributions are welcome under the same Apache-2.0 terms. Do not contribute
-real incident evidence, credentials, customer data, or third-party material that
-you are not allowed to share. See `CONTRIBUTING.md` and `SECURITY.md` before
-opening public issues or pull requests.
+Contributions are welcome under the same Apache-2.0 terms and require a
+`Signed-off-by` trailer under the [Developer Certificate of Origin](DCO). Do not
+contribute real incident evidence, credentials, customer data, or third-party
+material that you are not allowed to share. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md) before opening
+public issues or pull requests.
 
 ## Community Acknowledgments
 

@@ -7,7 +7,7 @@ requires-python = ">=3.11,<3.13"
 authors = [{name = "Kensho"}]
 maintainers = [{name = "Chill Ethical People", email = "contact@chillethicalpeople.com"}]
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE", "OWNERSHIP.md"]
+license-files = ["LICENSE", "NOTICE", "OWNERSHIP.md", "TRADEMARKS.md"]
 keywords = [
     "dfir",
     "digital-forensics",

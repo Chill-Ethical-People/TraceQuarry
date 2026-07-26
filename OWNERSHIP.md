@@ -24,7 +24,12 @@ assignment; repository participation alone is not an assignment.
 The TraceQuarry name and original visual identity remain project identity
 assets. The Apache-2.0 software license does not grant unrelated trademark,
 branding, endorsement, or passing-off rights beyond reasonable attribution and
-description of origin.
+description of origin. See `TRADEMARKS.md` for permitted references, fork
+branding, and requests for written permission.
+
+The official upstream project's decision rights and delegated maintainer roles
+are recorded in `GOVERNANCE.md`. These governance rules identify the official
+project; they do not reduce the software rights granted under Apache-2.0.
 
 Questions about project ownership, licensing, or authorized brand use may be
 sent to contact@chillethicalpeople.com.

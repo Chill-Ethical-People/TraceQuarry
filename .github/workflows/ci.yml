@@ -11,6 +11,17 @@ permissions:
   contents: read
 
 jobs:
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - name: Verify contribution provenance
+        run: python tools/check_dco.py --base-ref "${{ github.base_ref }}"
+
   test-and-package:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest

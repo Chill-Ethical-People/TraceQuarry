@@ -1,1 +1,13 @@
 * @kensho-cep
+
+# Project identity, ownership, and release authority require steward review.
+/LICENSE @kensho-cep
+/NOTICE @kensho-cep
+/OWNERSHIP.md @kensho-cep
+/TRADEMARKS.md @kensho-cep
+/GOVERNANCE.md @kensho-cep
+/DCO @kensho-cep
+/.github/workflows/ci.yml @kensho-cep
+/.github/PULL_REQUEST_TEMPLATE.md @kensho-cep
+/tools/check_dco.py @kensho-cep
+/.github/CODEOWNERS @kensho-cep
