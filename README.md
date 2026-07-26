@@ -97,8 +97,8 @@ arbitrary source mappings remain outside the public-beta interface.
 ## Guided Walkthrough
 
 <p align="center">
-  <a href="docs/media/tracequarry-walkthrough.webm">
-    <img src="docs/media/tracequarry-walkthrough.gif" width="960" alt="TraceQuarry guided walkthrough showing multi-collection Linux evidence intake, assisted investigation, per-collection progress, ATT&CK briefing, raw evidence review, analyst annotation, and export">
+  <a href="docs/media/tracequarry-walkthrough-v0.4.0-beta.2.webm">
+    <img src="docs/media/tracequarry-walkthrough-v0.4.0-beta.2.gif" width="960" alt="TraceQuarry v0.4.0-beta.2 guided walkthrough showing multi-collection Linux evidence intake, assisted investigation, per-collection progress, ATT&CK briefing, raw evidence review, analyst annotation, and export">
   </a>
 </p>
 
@@ -109,7 +109,7 @@ status, summary review, the ATT&CK-aware incident briefing, raw-record validatio
 analyst promotion into the reconstructed chronology, and investigation export.
 All displayed hosts, indicators, and activity are synthetic. Select the preview
 to open the
-[full-resolution WebM video](docs/media/tracequarry-walkthrough.webm).
+[full-resolution WebM video](docs/media/tracequarry-walkthrough-v0.4.0-beta.2.webm).
 
 ## Why Analysts Use TraceQuarry
 
