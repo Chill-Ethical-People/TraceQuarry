@@ -6,7 +6,7 @@ from pathlib import Path
 from uac_parser.timeline.event import TimelineEvent
 from uac_parser.timeline.timestamp import parse_any, parse_syslog
 
-from .common import read_text_lines
+from .common import read_syslog_lines, read_text_lines
 
 BASH_TS_RE = re.compile(r"^#(?P<epoch>\d{9,11})$")
 WEB_RE = re.compile(
@@ -22,8 +22,8 @@ def parse_cron(
     timezone_name: str = "UTC",
 ) -> list[TimelineEvent]:
     events = []
-    for raw in read_text_lines(path):
-        ts = parse_syslog(raw, year=year, timezone_name=timezone_name)
+    for raw, resolved_year in read_syslog_lines(path, year):
+        ts = parse_syslog(raw, year=resolved_year, timezone_name=timezone_name)
         if not ts:
             continue
         events.append(
@@ -150,6 +150,7 @@ def parse_systemd(path: Path, relative: str, host: str = "") -> list[TimelineEve
             timezone="UTC",
             timezone_confidence="missing",
             timestamp_type="file_observed",
+            evidence_role="state_observation",
             host=host,
             source_path=relative,
             source_type="systemd",
@@ -157,7 +158,7 @@ def parse_systemd(path: Path, relative: str, host: str = "") -> list[TimelineEve
             event_category="persistence",
             event_action=action,
             file_path=relative,
-            mitre=mitre,
+            mitre_candidates=mitre,
             severity=severity,
             confidence="medium",
             tags=tags,

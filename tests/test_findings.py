@@ -1,7 +1,7 @@
 import unittest
 from datetime import UTC, datetime, timedelta
 
-from uac_parser.enrich.ttp_rules import derive_findings
+from uac_parser.enrich.ttp_rules import derive_findings, enrich_events
 from uac_parser.parsers.auth import parse as parse_auth
 from uac_parser.timeline.event import TimelineEvent
 
@@ -19,6 +19,26 @@ def _ssh(action: str, when: datetime) -> TimelineEvent:
 
 
 class FindingTests(unittest.TestCase):
+    def test_state_inventory_does_not_claim_credential_access_behavior(self) -> None:
+        state = TimelineEvent(
+            source_type="shadow",
+            file_path="/etc/shadow",
+            event_action="password_state_observed",
+            evidence_role="state_observation",
+        )
+        behavior = TimelineEvent(
+            source_type="shell_history",
+            command="cat /etc/shadow",
+            event_action="shell_command",
+            event_category="execution",
+            evidence_role="behavior",
+        )
+
+        enrich_events([state, behavior])
+
+        self.assertNotIn("credential_material_access", state.detection_names)
+        self.assertIn("credential_material_access", behavior.detection_names)
+
     def test_auth_user_creation_preserves_full_username(self) -> None:
         import tempfile
         from pathlib import Path
@@ -112,3 +132,52 @@ class FindingTests(unittest.TestCase):
             if item["title"] == "Suid File Observed"
         )
         self.assertEqual(finding["severity"], "medium")
+
+    def test_policy_event_is_indexed_once_but_preserves_detection_count(self) -> None:
+        event = TimelineEvent(
+            event_id="evt-destructive",
+            event_action="destructive_command",
+            detection_names=["destructive_command"],
+            evidence_role="behavior",
+        )
+
+        finding = next(
+            item
+            for item in derive_findings([event])
+            if item["title"] == "Destructive Command"
+        )
+
+        self.assertEqual(finding["event_ids"], ["evt-destructive"])
+        self.assertIn("Observed 2 event(s)", finding["summary"])
+
+    def test_account_lifecycle_counts_unique_accounts_not_evidence_rows(self) -> None:
+        events = [
+            TimelineEvent(
+                event_id="evt-account-diff",
+                source_type="account_diff",
+                event_action="account_created_since_backup",
+                user="svc-backup",
+            ),
+            TimelineEvent(
+                event_id="evt-useradd",
+                source_type="auth_log",
+                event_action="user_created",
+                user="svc-backup",
+            ),
+            TimelineEvent(
+                event_id="evt-shadow-diff",
+                source_type="account_diff",
+                event_action="password_set_new_account",
+                user="svc-backup",
+            ),
+        ]
+
+        finding = next(
+            item
+            for item in derive_findings(events)
+            if item["title"] == "Account Lifecycle Changes Detected"
+        )
+
+        self.assertIn("1 unique account(s) observed as created", finding["summary"])
+        self.assertIn("across 3 supporting event(s)", finding["summary"])
+        self.assertNotIn("3 account(s) created", finding["summary"])

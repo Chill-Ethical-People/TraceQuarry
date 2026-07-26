@@ -9,6 +9,13 @@ detection pack. It contains four rule families:
   and TTPs.
 - `malware_payload_tags`: cautiously worded Linux malware and payload metadata.
 
+`attack_phases.yml` is the companion technique-to-tactic registry. It is pinned
+to a named MITRE ATT&CK release and keeps confirmed `attack_phases` separate from
+ambiguous or state-derived `attack_phase_candidates`. Multi-tactic techniques
+require an exact normalized event signal before a phase is confirmed. Add a
+mapping there whenever a detection rule introduces a technique ID that is not
+already covered. Do not infer a tactic from a tool name or free-text keyword.
+
 The parser loads tool and TTP rules during event enrichment and evaluates actor
 similarity profiles when deriving findings. Complex stateful analytics, such as
 SSH failures followed by success, remain in Python and can emit detection names
@@ -28,7 +35,7 @@ After installation:
 tracequarry-rules
 ```
 
-Validation rejects duplicate YAML keys, malformed rule IDs, unsupported
+Validation checks both YAML files and rejects duplicate YAML keys, malformed rule IDs, unsupported
 severity or confidence values, invalid ATT&CK IDs, missing required fields, and
 unknown source references.
 

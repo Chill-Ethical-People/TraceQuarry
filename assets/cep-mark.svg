@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" role="img" aria-labelledby="title desc">
   <title id="title">Chill Ethical People capybara mark</title>
-  <desc id="desc">A simple amber capybara with a dark outline and moss-green nose.</desc>
-  <path d="M 26 34 C 21 36, 18 41, 18 47 C 18 53, 21 58, 27 60 C 36 63, 52 64.5, 64 63 C 74 62, 80 56, 81 47 C 81.5 41, 80 36, 76 33 C 78 27, 73 23, 68 26 C 66 27.2, 65 29, 64.5 30 C 56 27.5, 44 29, 34 32 C 31 33, 28 33.5, 26 34 Z" fill="#E5A84B" stroke="#1B2430" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M 41 39.5 Q 45.5 44 50 40" stroke="#1B2430" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="25" cy="44" r="2.4" fill="#9DBE8D"/>
+  <desc id="desc">A white line-art capybara with a small amber nose accent.</desc>
+  <path d="M 24 35 C 19 38, 17 43, 18 49 C 19 55, 23 59, 29 61 C 39 64, 54 65, 65 63 C 75 61, 81 55, 82 47 C 83 41, 81 36, 76 33 C 78 27, 74 23, 69 25 C 66 27, 65 29, 65 31 C 56 28, 44 29, 34 32 C 30 33, 27 34, 24 35 Z" stroke="#F7F7F2" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 41 40 Q 45 44 50 40" stroke="#F7F7F2" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="25" cy="44" r="2.8" fill="#E5A84B"/>
 </svg>

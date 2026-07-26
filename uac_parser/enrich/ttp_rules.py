@@ -46,7 +46,10 @@ def _add(
     event.ttp_flags = sorted(set(event.ttp_flags + [action]))
     event.severity = _max_severity(event.severity, severity)
     event.tags = sorted(set(event.tags + tags))
-    event.mitre = sorted(set(event.mitre + mitre))
+    if event.evidence_role == "behavior":
+        event.mitre = sorted(set(event.mitre + mitre))
+    else:
+        event.mitre_candidates = sorted(set(event.mitre_candidates + mitre))
 
 
 def _max_severity(a: str, b: str) -> str:
@@ -69,237 +72,230 @@ def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
             continue
         execution_text = _execution_text(event)
         indicator_search = _looks_like_indicator_search(event)
-        if (
-            execution_text
-            and not indicator_search
-            and re.search(
-                r"(curl|wget)\b.*\|\s*(bash|sh|zsh)|base64\b.*(-d|--decode).*\|\s*(bash|sh)",
-                execution_text,
-            )
-        ):
-            _add(
-                event,
-                "download_execute_chain",
-                "high",
-                ["download", "shell", "ingress_tool_transfer"],
-                ["T1105", "T1059.004"],
-            )
-        if execution_text and re.search(r"\bchmod\s+\+?x\b", execution_text):
-            _add(
-                event,
-                "chmod_executable",
-                "medium",
-                ["chmod", "execution_prep"],
-                ["T1222.002"],
-            )
-        if re.search(r"(/tmp|/var/tmp|/dev/shm|/run)/[^\s;|&]+", text):
-            _add(
-                event,
-                "execution_or_artifact_from_tmp",
-                "medium",
-                ["suspicious_path", "tmp_execution"],
-                ["T1059.004"],
-            )
-        if execution_text and re.search(
-            r"\b(sudo\s+-l|sudo\s+su|su\s+-|usermod|useradd|adduser|groupmod|gpasswd)\b",
-            execution_text,
-        ):
-            _add(
-                event,
-                "account_or_privilege_change",
-                "medium",
-                ["account_change", "privilege"],
-                ["T1136.001", "T1548.003"],
-            )
-        if any(
-            secret in text
-            for secret in [
-                "/etc/shadow",
-                "id_rsa",
-                "id_ed25519",
-                ".aws/credentials",
-                ".kube/config",
-                "authorized_keys",
-            ]
-        ):
-            _add(
-                event,
-                "credential_material_access",
-                "high",
-                ["credential_access", "secrets"],
-                ["T1552.001"],
-            )
-        if execution_text and re.search(
-            r"\b(crontab|/etc/cron|cron\.d)\b", execution_text
-        ):
-            _add(
-                event, "cron_modified", "medium", ["persistence", "cron"], ["T1053.003"]
-            )
-        if execution_text and re.search(
-            r"\b(systemctl\s+(enable|start|restart)|/etc/systemd/system|\.service)\b",
-            execution_text,
-        ):
-            _add(
-                event,
-                "systemd_persistence_or_service_change",
-                "medium",
-                ["persistence", "systemd"],
-                ["T1543.002"],
-            )
-        if execution_text and re.search(
-            r"\b(history\s+-c|cat\s+/dev/null\s*>\s*.*history|truncate\s+-s\s+0|rm\s+.*(auth\.log|secure|syslog|messages|audit\.log))\b",
-            execution_text,
-        ):
-            _add(
-                event,
-                "log_or_history_tampering",
-                "high",
-                ["defense_evasion", "log_tampering"],
-                ["T1070"],
-            )
-        if execution_text and re.search(
-            r"\b(tar|zip|7z|rar|gzip|xz)\b.*\b(/home|/var/www|/etc|/root|/opt|/srv)\b",
-            execution_text,
-        ):
-            _add(
-                event,
-                "archive_creation_candidate",
-                "medium",
-                ["collection", "archive"],
-                ["T1560.001"],
-            )
-        if execution_text and re.search(
-            r"\b(mysqldump|pg_dump|mongodump|redis-cli\s+save)\b", execution_text
-        ):
-            _add(event, "database_dump", "high", ["collection", "database"], ["T1005"])
-        if execution_text and re.search(
-            r"\b(rm\s+-rf|shred|wipe|dd\s+if=)\b", execution_text
-        ):
-            _add(
-                event,
-                "destructive_command",
-                "high",
-                ["impact", "destructive"],
-                ["T1485"],
-            )
-        if execution_text and re.search(r"\b(vim-cmd|esxcli)\b", execution_text):
-            _add(
-                event,
-                "esxi_or_vmware_admin_command",
-                "high",
-                ["ransomware", "esxi"],
-                ["T1486"],
-            )
-        if (
-            execution_text
-            and not indicator_search
-            and re.search(
-                r"\b(ssh\s+-[rld]|/dev/tcp/|bash\s+-i|pty\.spawn|mkfifo)\b",
-                execution_text,
-            )
-        ):
-            _add(
-                event,
-                "reverse_shell_or_tunnel_pattern",
-                "high",
-                ["c2", "reverse_shell"],
-                ["T1095", "T1059.004"],
-            )
-        if execution_text and re.search(
-            r"\b(curl|wget)\b.*(169\.254\.169\.254|metadata\.google\.internal)",
-            execution_text,
-        ):
-            _add(
-                event,
-                "cloud_metadata_access",
-                "high",
-                ["cloud", "credential_access"],
-                ["T1552.005"],
-            )
-        if re.search(r"docker\.sock|/var/run/docker\.sock", text):
-            _add(
-                event,
-                "docker_socket_access",
-                "high",
-                ["container", "privilege"],
-                ["T1611"],
-            )
-        if (
-            execution_text
-            and not indicator_search
-            and re.search(
-                r"\bssh\s+(?!-[vVT])\S+@\S+|\bssh\s+\S+\s+\S+@", execution_text
-            )
-        ):
-            _add(
-                event,
-                "outbound_ssh_command",
-                "high",
-                ["lateral_movement", "ssh"],
-                ["T1021.004"],
-            )
-        if execution_text and re.search(r"\b(scp|rsync)\s+.*\S+@\S+:", execution_text):
-            _add(
-                event,
-                "outbound_file_transfer_command",
-                "high",
-                ["lateral_movement", "file_transfer"],
-                ["T1021.004", "T1105"],
-            )
-        if (
-            execution_text
-            and re.search(r"\bpasswd\s+\S+", execution_text)
-            and "change" not in execution_text
-        ):
-            _add(
-                event,
-                "password_set_command",
-                "medium",
-                ["credential_change", "account_management"],
-                ["T1098"],
-            )
-        if event.source_type == "shell_history" and _looks_like_plaintext_password(
-            event
-        ):
-            _add(
-                event,
-                "plaintext_password_in_history",
-                "critical",
-                ["credential_exposure", "password_leak"],
-                ["T1552.001"],
-            )
-        if execution_text and re.search(
-            r"\b(telnet|nc\s+-[zvw])\s+\S+\s+\d+", execution_text
-        ):
-            _add(
-                event,
-                "network_connectivity_test",
-                "medium",
-                ["reconnaissance", "network_probe"],
-                ["T1046"],
-            )
-        for action, tools in TOOL_GROUPS.items():
-            if not execution_text:
-                continue
-            if any(
-                re.search(
-                    rf"(^|[^a-z0-9_.-]){re.escape(tool)}([^a-z0-9_.-]|$)",
-                    execution_text,
-                )
-                for tool in tools
-            ):
-                severity = (
-                    "high"
-                    if action
-                    in {"exfil_tool_usage", "miner_execution", "tunnel_or_proxy_tool"}
-                    else "medium"
-                )
-                _add(event, action, severity, ["tooling", action], _tool_mitre(action))
+        _apply_execution_rules(event, text, execution_text, indicator_search)
+        _apply_collection_and_impact_rules(event, execution_text, indicator_search)
+        _apply_access_and_network_rules(event, text, execution_text, indicator_search)
+        _apply_tool_group_tags(event, execution_text)
         _apply_registry_tool_tags(
             event, text, execution_text, indicator_search, registry_tools
         )
         _apply_registry_ttp_tags(event, registry_ttps)
     return events
+
+
+def _apply_execution_rules(
+    event: TimelineEvent, text: str, execution_text: str, indicator_search: bool
+) -> None:
+    if (
+        execution_text
+        and not indicator_search
+        and re.search(
+            r"(curl|wget)\b.*\|\s*(bash|sh|zsh)|base64\b.*(-d|--decode).*\|\s*(bash|sh)",
+            execution_text,
+        )
+    ):
+        _add(
+            event,
+            "download_execute_chain",
+            "high",
+            ["download", "shell", "ingress_tool_transfer"],
+            ["T1105", "T1059.004"],
+        )
+    if execution_text and re.search(r"\bchmod\s+\+?x\b", execution_text):
+        _add(event, "chmod_executable", "medium", ["chmod", "execution_prep"], [])
+    if re.search(r"(/tmp|/var/tmp|/dev/shm|/run)/[^\s;|&]+", text):
+        _add(
+            event,
+            "execution_or_artifact_from_tmp",
+            "medium",
+            ["suspicious_path", "tmp_execution"],
+            ["T1059.004"],
+        )
+    if execution_text and re.search(
+        r"\b(sudo\s+-l|sudo\s+su|su\s+-|usermod|useradd|adduser|groupmod|gpasswd)\b",
+        execution_text,
+    ):
+        _add(
+            event,
+            "account_or_privilege_change",
+            "medium",
+            ["account_change", "privilege"],
+            ["T1136.001", "T1548.003"],
+        )
+    secrets = (
+        "/etc/shadow",
+        "id_rsa",
+        "id_ed25519",
+        ".aws/credentials",
+        ".kube/config",
+        "authorized_keys",
+    )
+    if event.evidence_role == "behavior" and any(secret in text for secret in secrets):
+        _add(
+            event,
+            "credential_material_access",
+            "high",
+            ["credential_access", "secrets"],
+            ["T1552.001"],
+        )
+    if execution_text and re.search(r"\b(crontab|/etc/cron|cron\.d)\b", execution_text):
+        _add(event, "cron_modified", "medium", ["persistence", "cron"], ["T1053.003"])
+    if execution_text and re.search(
+        r"\b(systemctl\s+(enable|start|restart)|/etc/systemd/system|\.service)\b",
+        execution_text,
+    ):
+        _add(
+            event,
+            "systemd_persistence_or_service_change",
+            "medium",
+            ["persistence", "systemd"],
+            ["T1543.002"],
+        )
+
+
+def _apply_collection_and_impact_rules(
+    event: TimelineEvent, execution_text: str, indicator_search: bool
+) -> None:
+    if execution_text and re.search(
+        r"\b(history\s+-c|cat\s+/dev/null\s*>\s*.*history|truncate\s+-s\s+0|rm\s+.*(auth\.log|secure|syslog|messages|audit\.log))\b",
+        execution_text,
+    ):
+        _add(
+            event,
+            "log_or_history_tampering",
+            "high",
+            ["defense_evasion", "log_tampering"],
+            ["T1070"],
+        )
+    if execution_text and re.search(
+        r"\b(tar|zip|7z|rar|gzip|xz)\b.*\b(/home|/var/www|/etc|/root|/opt|/srv)\b",
+        execution_text,
+    ):
+        _add(
+            event,
+            "archive_creation_candidate",
+            "medium",
+            ["collection", "archive"],
+            ["T1560.001"],
+        )
+    if execution_text and re.search(
+        r"\b(mysqldump|pg_dump|mongodump|redis-cli\s+save)\b", execution_text
+    ):
+        _add(event, "database_dump", "high", ["collection", "database"], ["T1005"])
+    if execution_text and re.search(
+        r"\b(rm\s+-rf|shred|wipe|dd\s+if=)\b", execution_text
+    ):
+        _add(event, "destructive_command", "high", ["impact", "destructive"], ["T1485"])
+    if execution_text and re.search(r"\b(vim-cmd|esxcli)\b", execution_text):
+        _add(
+            event,
+            "esxi_or_vmware_admin_command",
+            "high",
+            ["ransomware", "esxi"],
+            ["T1486"],
+        )
+    if (
+        execution_text
+        and not indicator_search
+        and re.search(
+            r"\b(ssh\s+-[rld]|/dev/tcp/|bash\s+-i|pty\.spawn|mkfifo)\b",
+            execution_text,
+        )
+    ):
+        _add(
+            event,
+            "reverse_shell_or_tunnel_pattern",
+            "high",
+            ["c2", "reverse_shell"],
+            ["T1095", "T1059.004"],
+        )
+    if execution_text and re.search(
+        r"\b(curl|wget)\b.*(169\.254\.169\.254|metadata\.google\.internal)",
+        execution_text,
+    ):
+        _add(
+            event,
+            "cloud_metadata_access",
+            "high",
+            ["cloud", "credential_access"],
+            ["T1552.005"],
+        )
+
+
+def _apply_access_and_network_rules(
+    event: TimelineEvent, text: str, execution_text: str, indicator_search: bool
+) -> None:
+    if re.search(r"docker\.sock|/var/run/docker\.sock", text):
+        _add(
+            event, "docker_socket_access", "high", ["container", "privilege"], ["T1611"]
+        )
+    if (
+        execution_text
+        and not indicator_search
+        and re.search(r"\bssh\s+(?!-[vVT])\S+@\S+|\bssh\s+\S+\s+\S+@", execution_text)
+    ):
+        _add(
+            event,
+            "outbound_ssh_command",
+            "high",
+            ["lateral_movement", "ssh"],
+            ["T1021.004"],
+        )
+    if execution_text and re.search(r"\b(scp|rsync)\s+.*\S+@\S+:", execution_text):
+        _add(
+            event,
+            "outbound_file_transfer_command",
+            "high",
+            ["lateral_movement", "file_transfer"],
+            ["T1021.004", "T1105"],
+        )
+    if (
+        execution_text
+        and re.search(r"\bpasswd\s+\S+", execution_text)
+        and "change" not in execution_text
+    ):
+        _add(
+            event,
+            "password_set_command",
+            "medium",
+            ["credential_change", "account_management"],
+            ["T1098"],
+        )
+    if event.source_type == "shell_history" and _looks_like_plaintext_password(event):
+        _add(
+            event,
+            "plaintext_password_in_history",
+            "critical",
+            ["credential_exposure", "password_leak"],
+            ["T1552.001"],
+        )
+    if execution_text and re.search(
+        r"\b(telnet|nc\s+-[zvw])\s+\S+\s+\d+", execution_text
+    ):
+        _add(
+            event,
+            "network_connectivity_test",
+            "medium",
+            ["reconnaissance", "network_probe"],
+            ["T1046"],
+        )
+
+
+def _apply_tool_group_tags(event: TimelineEvent, execution_text: str) -> None:
+    if not execution_text:
+        return
+    high_severity = {"exfil_tool_usage", "miner_execution", "tunnel_or_proxy_tool"}
+    for action, tools in TOOL_GROUPS.items():
+        if not any(
+            re.search(
+                rf"(^|[^a-z0-9_.-]){re.escape(tool)}([^a-z0-9_.-]|$)",
+                execution_text,
+            )
+            for tool in tools
+        ):
+            continue
+        severity = "high" if action in high_severity else "medium"
+        _add(event, action, severity, ["tooling", action], _tool_mitre(action))
 
 
 def _apply_registry_tool_tags(
@@ -327,7 +323,7 @@ def _apply_registry_tool_tags(
             "high"
             if executed and confidence == "high"
             else "medium"
-            if confidence in {"high", "medium"}
+            if executed and confidence in {"high", "medium"}
             else "low"
         )
         tags = [
@@ -542,52 +538,8 @@ def _tool_mitre(action: str) -> list[str]:
 
 SSH_FAILURE_WINDOW = timedelta(minutes=30)
 
-
-def derive_findings(
-    events: list[TimelineEvent],
-    *,
-    available_source_types: set[str] | None = None,
-) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
-    failures: dict[tuple[str | None, str | None], list[TimelineEvent]] = defaultdict(
-        list
-    )
-    successes: list[TimelineEvent] = []
-    actions: Counter[str] = Counter()
-    for event in events:
-        actions[event.event_action] += 1
-        for detection in event.detection_names:
-            actions[detection] += 1
-        if event.event_action == "ssh_login_failure":
-            failures[(event.user, event.src_ip)].append(event)
-        elif event.event_action == "ssh_login_success":
-            successes.append(event)
-    for success in successes:
-        prior = failures.get((success.user, success.src_ip), [])
-        success_time = _event_datetime(success)
-        recent = [
-            event
-            for event in prior
-            if success_time
-            and (failure_time := _event_datetime(event))
-            and timedelta(0) <= success_time - failure_time <= SSH_FAILURE_WINDOW
-        ]
-        if len(recent) >= 5:
-            findings.append(
-                {
-                    "title": "Successful SSH login after repeated failures",
-                    "severity": "high",
-                    "confidence": "medium",
-                    "event_ids": [success.event_id] + [e.event_id for e in recent[-5:]],
-                    "summary": (
-                        f"{success.user} logged in from {success.src_ip} after {len(recent)} failed attempts "
-                        f"within {int(SSH_FAILURE_WINDOW.total_seconds() // 60)} minutes."
-                    ),
-                    "tags": ["ssh_bruteforce", "valid_account"],
-                    "evidence_window_seconds": int(SSH_FAILURE_WINDOW.total_seconds()),
-                }
-            )
-    finding_policies = {
+FINDING_POLICIES = frozenset(
+    {
         "download_execute_chain",
         "credential_material_access",
         "log_or_history_tampering",
@@ -600,8 +552,8 @@ def derive_findings(
         "uid0_non_root_account",
         "container_group_privilege_risk",
         "nopasswd_sudo_rule",
+        "broad_nopasswd_sudo_rule",
         "dangerous_sudo_rule_candidate",
-        "unrestricted_authorized_key",
         "suspicious_cron_entry",
         "suspicious_systemd_execstart",
         "ld_so_preload_modified",
@@ -631,7 +583,10 @@ def derive_findings(
         "auth_user_deleted",
         "auth_password_changed",
     }
-    medium_finding_actions = {
+)
+
+MEDIUM_FINDING_ACTIONS = frozenset(
+    {
         "suid_file_observed",
         "sgid_file_observed",
         "container_group_privilege_risk",
@@ -639,28 +594,97 @@ def derive_findings(
         "audit_authentication_failure",
         "audit_anomaly",
     }
-    for action in finding_policies:
+)
+
+
+def derive_findings(
+    events: list[TimelineEvent],
+    *,
+    available_source_types: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    failures: dict[tuple[str | None, str | None], list[TimelineEvent]] = defaultdict(
+        list
+    )
+    successes: list[TimelineEvent] = []
+    actions: Counter[str] = Counter()
+    matches_by_policy: dict[str, list[TimelineEvent]] = defaultdict(list)
+    for event in events:
+        actions[event.event_action] += 1
+        matched_policies: set[str] = set()
+        if event.event_action in FINDING_POLICIES:
+            matched_policies.add(event.event_action)
+        for detection in event.detection_names:
+            actions[detection] += 1
+            if detection in FINDING_POLICIES:
+                matched_policies.add(detection)
+        for policy in matched_policies:
+            matches_by_policy[policy].append(event)
+        if event.event_action == "ssh_login_failure":
+            failures[(event.user, event.src_ip)].append(event)
+        elif event.event_action == "ssh_login_success":
+            successes.append(event)
+    for success in successes:
+        prior = failures.get((success.user, success.src_ip), [])
+        success_time = _event_datetime(success)
+        recent = [
+            event
+            for event in prior
+            if success_time
+            and (failure_time := _event_datetime(event))
+            and timedelta(0) <= success_time - failure_time <= SSH_FAILURE_WINDOW
+        ]
+        if len(recent) >= 5:
+            findings.append(
+                {
+                    "title": "Successful SSH login after repeated failures",
+                    "severity": "high",
+                    "confidence": "medium",
+                    "event_ids": [success.event_id] + [e.event_id for e in recent[-5:]],
+                    "summary": (
+                        f"{success.user} logged in from {success.src_ip} after {len(recent)} failed attempts "
+                        f"within {int(SSH_FAILURE_WINDOW.total_seconds() // 60)} minutes."
+                    ),
+                    "tags": ["ssh_bruteforce", "valid_account"],
+                    "evidence_window_seconds": int(SSH_FAILURE_WINDOW.total_seconds()),
+                }
+            )
+    for action in FINDING_POLICIES:
         if actions[action]:
-            matched_events = [
-                e
-                for e in events
-                if e.event_action == action or action in e.detection_names
-            ]
-            severity = "medium" if action in medium_finding_actions else "high"
+            matched_events = matches_by_policy[action]
+            severity = "medium" if action in MEDIUM_FINDING_ACTIONS else "high"
+            state_only = bool(matched_events) and all(
+                event.evidence_role != "behavior" for event in matched_events
+            )
+            if state_only:
+                severity = "medium"
             confidence = (
                 "high"
                 if matched_events
                 and all(e.confidence == "high" for e in matched_events)
                 else "medium"
             )
+            if state_only:
+                confidence = "low"
+            finding_tags = [action]
+            if state_only:
+                finding_tags.extend(["contextual_evidence", "requires_corroboration"])
             findings.append(
                 {
                     "title": action.replace("_", " ").title(),
                     "severity": severity,
                     "confidence": confidence,
                     "event_ids": [event.event_id for event in matched_events[:10]],
-                    "summary": f"Observed {actions[action]} event(s) matching {action}.",
-                    "tags": [action],
+                    "summary": (
+                        f"Observed {actions[action]} state or inferred event(s) matching {action}; "
+                        "this does not establish execution or attacker action without corroboration."
+                        if state_only
+                        else f"Observed {actions[action]} event(s) matching {action}."
+                    ),
+                    "tags": finding_tags,
+                    "evidence_roles": sorted(
+                        {event.evidence_role for event in matched_events}
+                    ),
                 }
             )
     findings.extend(_bruteforce_campaign_findings(events))
@@ -849,15 +873,38 @@ def _account_lifecycle_findings(events: list[TimelineEvent]) -> list[dict[str, A
     parts = []
     if created:
         users = sorted({e.user for e in created if e.user})
-        parts.append(f"{len(created)} account(s) created ({', '.join(users)})")
+        if users:
+            parts.append(
+                f"{len(users)} unique account(s) observed as created "
+                f"({', '.join(users)}) across {len(created)} supporting event(s)"
+            )
+        else:
+            parts.append(
+                f"{len(created)} account-creation event(s) without a parsed username"
+            )
     if deleted:
         users = sorted({e.user for e in deleted if e.user})
-        parts.append(f"{len(deleted)} account(s) deleted ({', '.join(users)})")
+        if users:
+            parts.append(
+                f"{len(users)} unique account(s) observed as deleted "
+                f"({', '.join(users)}) across {len(deleted)} supporting event(s)"
+            )
+        else:
+            parts.append(
+                f"{len(deleted)} account-deletion event(s) without a parsed username"
+            )
     if pw_changed:
         users = sorted({e.user for e in pw_changed if e.user})
-        parts.append(
-            f"{len(pw_changed)} password(s) changed/unlocked ({', '.join(users)})"
-        )
+        if users:
+            parts.append(
+                f"{len(users)} unique account(s) with password changes or unlocks "
+                f"({', '.join(users)}) across {len(pw_changed)} supporting event(s)"
+            )
+        else:
+            parts.append(
+                f"{len(pw_changed)} password-change or unlock event(s) "
+                "without a parsed username"
+            )
     if group_changes:
         parts.append(f"{len(group_changes)} group membership change(s)")
     if parts:
@@ -889,7 +936,7 @@ def _actor_like_findings(events: list[TimelineEvent]) -> list[dict[str, Any]]:
         signals.update(f"ttp.{value}" for value in event.detection_names)
         signals.update(f"ttp.{value}" for value in event.ttp_flags)
         for signal in signals:
-            if event.event_id and event.event_id not in evidence[signal]:
+            if event.event_id:
                 evidence[signal].append(event.event_id)
 
     observed = set(evidence)
@@ -913,10 +960,13 @@ def _actor_like_findings(events: list[TimelineEvent]) -> list[dict[str, Any]]:
             continue
 
         event_ids: list[str] = []
+        seen_event_ids: set[str] = set()
         for indicator in matched:
             for event_id in evidence[indicator]:
-                if event_id not in event_ids:
-                    event_ids.append(event_id)
+                if event_id in seen_event_ids:
+                    continue
+                seen_event_ids.add(event_id)
+                event_ids.append(event_id)
         minimum_event_count = int(profile.get("minimum_event_count", 2))
         if len(event_ids) < minimum_event_count:
             continue

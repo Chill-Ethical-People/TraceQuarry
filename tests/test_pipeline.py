@@ -25,7 +25,7 @@ class PipelineTests(unittest.TestCase):
             self.assertGreater(result.events, 0)
             self.assertEqual(result.errors, 0)
             manifest = json.loads((output / "run_manifest.json").read_text())
-            self.assertEqual(manifest["tracequarry_version"], "0.4.0b1")
+            self.assertEqual(manifest["tracequarry_version"], "0.4.0b2")
             self.assertGreater(manifest["coverage"]["sources_discovered"], 0)
             self.assertEqual(manifest["coverage"]["sources_failed"], 0)
             self.assertTrue(all(source["sha256"] for source in manifest["sources"]))
@@ -117,3 +117,44 @@ class PipelineTests(unittest.TestCase):
                     for item in findings
                 )
             )
+
+    def test_parallel_case_pipeline_is_deterministic_and_reports_each_collection(
+        self,
+    ) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "uac_sample"
+        with tempfile.TemporaryDirectory() as directory:
+            serial_output = Path(directory) / "serial"
+            parallel_output = Path(directory) / "parallel"
+            serial = run_case_pipeline(
+                [fixture, fixture], serial_output, year=2026, max_workers=1
+            )
+            progress: list[dict[str, object]] = []
+            parallel = run_case_pipeline(
+                [fixture, fixture],
+                parallel_output,
+                year=2026,
+                max_workers=2,
+                progress_callback=progress.append,
+            )
+
+            self.assertEqual(parallel.events, serial.events)
+            self.assertEqual(parallel.findings, serial.findings)
+            self.assertEqual(parallel.duplicate_collections, 1)
+            self.assertEqual(len(list((parallel_output / "hosts").iterdir())), 2)
+            completed = {
+                int(item["collection_index"])
+                for item in progress
+                if item.get("stage") == "collection_complete"
+            }
+            self.assertEqual(completed, {1, 2})
+            serial_lines = (serial_output / "case_timeline_full.jsonl").read_text()
+            parallel_lines = (parallel_output / "case_timeline_full.jsonl").read_text()
+            self.assertEqual(parallel_lines, serial_lines)
+
+    def test_case_pipeline_rejects_zero_workers(self) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "uac_sample"
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            self.assertRaisesRegex(ValueError, "workers"),
+        ):
+            run_case_pipeline([fixture], directory, max_workers=0)

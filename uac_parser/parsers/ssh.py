@@ -22,17 +22,17 @@ def parse_authorized_keys(
             continue
         match = KEY_RE.match(text)
         detections = ["authorized_key_present"]
-        severity = "medium"
-        tags = ["ssh", "authorized_keys", "persistence"]
+        severity = "informational"
+        tags = ["ssh", "authorized_keys", "persistence_candidate"]
         if text.startswith("command=") or "from=" in text:
             tags.append("restricted_key")
         if "no-pty" not in text and "command=" not in text:
-            detections.append("unrestricted_authorized_key")
-            severity = "high"
+            tags.append("unrestricted_key")
         events.append(
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -46,7 +46,7 @@ def parse_authorized_keys(
                 tags=tags,
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1098.004"],
+                mitre_candidates=["T1098.004"],
                 summary=f"SSH authorized key observed in {relative}:{lineno}",
                 raw=raw,
                 extra={
@@ -70,6 +70,7 @@ def parse_known_hosts(path: Path, relative: str, host: str = "") -> list[Timelin
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="context",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -84,7 +85,7 @@ def parse_known_hosts(path: Path, relative: str, host: str = "") -> list[Timelin
                 tags=["ssh", "known_hosts"],
                 detection_names=["ssh_known_host_observed"],
                 ttp_flags=["ssh_known_host_observed"],
-                mitre=["T1021.004"],
+                mitre_candidates=["T1021.004"],
                 summary=f"SSH known host observed: {host_field}",
                 raw=raw,
                 extra={"line": lineno},
@@ -117,6 +118,7 @@ def parse_sshd_config(path: Path, relative: str, host: str = "") -> list[Timelin
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -130,7 +132,7 @@ def parse_sshd_config(path: Path, relative: str, host: str = "") -> list[Timelin
                 tags=["ssh", "configuration"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1021.004"] if detections else [],
+                mitre_candidates=["T1021.004"] if detections else [],
                 summary=f"sshd config {parts[0]}={parts[1]}",
                 raw=raw,
                 extra={"line": lineno, "key": key, "value": value},

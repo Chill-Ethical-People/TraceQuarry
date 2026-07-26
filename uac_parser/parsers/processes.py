@@ -86,6 +86,7 @@ def parse_ps(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -102,7 +103,7 @@ def parse_ps(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
                 tags=tags,
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=mitre,
+                mitre_candidates=mitre,
                 summary=f"Process running: {user} pid={pid} {command[:120]}",
                 raw=raw,
                 extra={

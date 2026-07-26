@@ -10,6 +10,16 @@ By submitting a pull request, patch, issue attachment, or other contribution,
 you agree that your contribution is provided under the Apache License, Version
 2.0, unless you explicitly mark it as "Not a Contribution."
 
+Kensho is the creator, original copyright owner, and project steward of
+TraceQuarry. Chill Ethical People is the organizational home and maintainer
+community. Organization membership, repository permissions, or maintainer
+status does not transfer ownership of the original project.
+
+You retain copyright in your contribution unless you enter into a separate
+written copyright assignment. Submission under Apache-2.0 grants the project
+and its users the rights stated in that license; it is not a copyright
+assignment. See `OWNERSHIP.md`.
+
 Do not submit code, indicators, reports, evidence, screenshots, customer data,
 or third-party content that you do not have permission to share.
 
@@ -40,6 +50,32 @@ PYTHONPATH=. python3 -m uac_parser.rules_cli
 Actor entries must remain profile similarity only. The validator rejects a
 `high` actor confidence cap, and submissions must not present shared tooling or
 ATT&CK overlap as attribution.
+
+## Agent Skill Contributions
+
+Keep `skills/tracequarry/SKILL.md` as the canonical TraceQuarry Agent Skill. Its
+YAML frontmatter
+must contain only `name` and `description`; put every usage trigger in the
+description so compatible agents can select it before loading the body.
+
+- Keep the core workflow concise and imperative.
+- Put detailed schemas and investigation variants in
+  `skills/tracequarry/references/` and link them
+  directly from `SKILL.md`.
+- Keep `skills/tracequarry/agents/openai.yaml` aligned with the skill name,
+  prompt, and bundled brand assets.
+- Update commands, profile names, output names, and evidence semantics whenever
+  their implementation changes.
+- Preserve cautious DFIR language: state is not execution, missing evidence is
+  not a negative finding, tooling overlap is not malware identity, and profile
+  similarity is not attribution.
+- Use synthetic examples only and never add case evidence or workstation paths.
+
+Validate the community skill contract before opening a pull request:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_agent_skill.py' -v
+```
 
 ## Development Smoke Test
 

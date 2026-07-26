@@ -23,6 +23,9 @@ def parse_sudoers(path: Path, relative: str, host: str = "") -> list[TimelineEve
         severity = "low"
         if "NOPASSWD" in text:
             detections.append("nopasswd_sudo_rule")
+            severity = "medium"
+        if "NOPASSWD" in text and re.search(r"\bALL\s*(?:,|$)", text):
+            detections.append("broad_nopasswd_sudo_rule")
             severity = "high"
         if DANGEROUS_SUDO.search(text):
             detections.append("dangerous_sudo_rule_candidate")
@@ -31,6 +34,7 @@ def parse_sudoers(path: Path, relative: str, host: str = "") -> list[TimelineEve
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -45,7 +49,7 @@ def parse_sudoers(path: Path, relative: str, host: str = "") -> list[TimelineEve
                 tags=["sudo", "privilege"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1548.003"],
+                mitre_candidates=["T1548.003"],
                 summary=f"Sudoers rule observed in {relative}:{lineno}",
                 raw=raw,
                 extra={"line": lineno},
@@ -87,6 +91,7 @@ def parse_bodyfile_privilege(
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -102,7 +107,7 @@ def parse_bodyfile_privilege(
                 tags=["suid_sgid", "privilege"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1548.001"],
+                mitre_candidates=["T1548.001"],
                 summary=f"Privileged file mode observed: {mode} {name}",
                 raw=raw,
                 extra={"mode": mode, "size": size},
@@ -143,6 +148,7 @@ def parse_capabilities(
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -156,7 +162,7 @@ def parse_capabilities(
                 tags=["capabilities", "privilege"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1548"],
+                mitre_candidates=["T1548"],
                 summary=f"File capability observed: {text}",
                 raw=raw,
             )

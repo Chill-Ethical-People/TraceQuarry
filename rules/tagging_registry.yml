@@ -834,7 +834,7 @@ ttp_tags:
     severity: medium
     confidence_when_matched: medium
     evidence: "Execution or payload artifact under /tmp, /var/tmp, /dev/shm, /run."
-    mitre: ["T1059.004", "T1036.005"]
+    mitre: ["T1059.004"]
     timesketch_labels: ["ttp.tmp_execution"]
     match_detection_names: ["execution_or_artifact_from_tmp", "audit_exec_from_tmp"]
 

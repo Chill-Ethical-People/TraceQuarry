@@ -113,6 +113,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/passwd vs etc/passwd-",
@@ -128,7 +129,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "account_created"],
                     detection_names=["account_created_since_backup"],
                     ttp_flags=["account_created_since_backup"],
-                    mitre=["T1136.001"],
+                    mitre_candidates=["T1136.001"],
                     summary=f"Account created since backup: {user} uid={info['uid']} shell={info['shell']}",
                     raw=info["raw"],
                     extra={
@@ -152,6 +153,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                     TimelineEvent(
                         timestamp="",
                         timestamp_type="state_observed",
+                        evidence_role="inference",
                         timezone_confidence="missing",
                         host=host,
                         source_path="etc/passwd vs etc/passwd-",
@@ -167,7 +169,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                         tags=["account", "account_diff", "account_modified"],
                         detection_names=["account_modified_since_backup"],
                         ttp_flags=["account_modified_since_backup"],
-                        mitre=["T1098"],
+                        mitre_candidates=["T1098"],
                         summary=f"Account modified since backup: {user} ({', '.join(changes)})",
                         raw=info["raw"],
                         extra={"changes": changes},
@@ -179,6 +181,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/passwd vs etc/passwd-",
@@ -194,7 +197,7 @@ def _diff_passwd(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "account_deleted"],
                     detection_names=["account_deleted_since_backup"],
                     ttp_flags=["account_deleted_since_backup"],
-                    mitre=["T1531"],
+                    mitre_candidates=["T1531"],
                     summary=f"Account deleted since backup: {user} uid={info['uid']}",
                     raw=info["raw"],
                 )
@@ -218,6 +221,7 @@ def _diff_shadow(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp=ts,
                     timestamp_type="password_change_time" if ts else "state_observed",
+                    evidence_role="inference",
                     timezone="UTC",
                     timezone_confidence="source_epoch" if ts else "missing",
                     host=host,
@@ -233,7 +237,7 @@ def _diff_shadow(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "password_set", "new_account"],
                     detection_names=["password_set_new_account"],
                     ttp_flags=["password_set_new_account"],
-                    mitre=["T1136.001"],
+                    mitre_candidates=["T1136.001"],
                     summary=f"Password set for new account: {user}",
                     raw="[shadow hash redacted]",
                     extra={"last_change_day": info["last_change_day"]},
@@ -268,6 +272,7 @@ def _diff_shadow(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp=ts,
                     timestamp_type="password_change_time" if ts else "state_observed",
+                    evidence_role="inference",
                     timezone="UTC",
                     timezone_confidence="source_epoch" if ts else "missing",
                     host=host,
@@ -283,7 +288,7 @@ def _diff_shadow(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "credential_change"],
                     detection_names=detections,
                     ttp_flags=detections,
-                    mitre=mitre,
+                    mitre_candidates=mitre,
                     summary=summary,
                     raw="[shadow hash redacted]",
                     extra={
@@ -312,6 +317,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/group vs etc/group-",
@@ -325,7 +331,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "group_created"],
                     detection_names=["group_created_since_backup"],
                     ttp_flags=["group_created_since_backup"],
-                    mitre=["T1136.001"],
+                    mitre_candidates=["T1136.001"],
                     summary=f"Group created since backup: {group} gid={info['gid']} members={info['members']}",
                     raw=info["raw"],
                     extra={"group": group, "members": info["members"]},
@@ -346,6 +352,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/group vs etc/group-",
@@ -360,7 +367,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                     tags=["account", "account_diff", "group_membership"],
                     detection_names=detections,
                     ttp_flags=detections,
-                    mitre=["T1098"] if is_priv else [],
+                    mitre_candidates=["T1098"] if is_priv else [],
                     summary=f"User {member} added to group {group} since backup",
                     raw=info["raw"],
                     extra={"group": group, "old_members": sorted(old_members)},
@@ -371,6 +378,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/group vs etc/group-",
@@ -397,6 +405,7 @@ def _diff_group(root: Path, host: str) -> list[TimelineEvent]:
                 TimelineEvent(
                     timestamp="",
                     timestamp_type="state_observed",
+                    evidence_role="inference",
                     timezone_confidence="missing",
                     host=host,
                     source_path="etc/group vs etc/group-",

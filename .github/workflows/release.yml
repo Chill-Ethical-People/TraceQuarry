@@ -24,6 +24,8 @@ jobs:
           ruff format --check uac_parser tests tools
           mypy uac_parser
           bandit -q -c pyproject.toml -r uac_parser
+          python tools/check_web_resources.py
+          node --check web/app.js
           coverage run -m unittest discover -s tests -v
           coverage report
           pip-audit . --strict --progress-spinner off
@@ -37,6 +39,8 @@ jobs:
           output-file: dist/tracequarry-${{ github.ref_name }}.cdx.json
           upload-artifact: false
           upload-release-assets: false
+      - name: Package Agent Skill
+        run: python tools/package_agent_skill.py --output dist/tracequarry-skill.zip
       - name: Generate checksums
         working-directory: dist
         run: sha256sum tracequarry-* > SHA256SUMS

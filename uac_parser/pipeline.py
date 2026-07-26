@@ -3,12 +3,17 @@ from __future__ import annotations
 import json
 import platform
 import re
+import tarfile
+import zipfile
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from uac_parser import __version__
 from uac_parser.assist import (
@@ -17,30 +22,44 @@ from uac_parser.assist import (
     validate_profile,
     write_assisted_investigation,
 )
+from uac_parser.enrich.attack_phases import (
+    attack_phase_metadata,
+    attack_phase_registry_path,
+    enrich_attack_phases,
+)
 from uac_parser.enrich.correlation import correlate_state_events
 from uac_parser.enrich.iocs import Ioc, ioc_finding, match_iocs, write_ioc_hits
 from uac_parser.enrich.rule_registry import registry_path
 from uac_parser.enrich.storylines import build_storylines
 from uac_parser.enrich.ttp_rules import derive_findings, enrich_events
-from uac_parser.loaders.archive import load_input
+from uac_parser.integrations.caseweave import (
+    default_case_reference,
+    write_caseweave_bundle,
+)
+from uac_parser.loaders.archive import LoadedCase, load_input
 from uac_parser.loaders.uac_layout import (
+    EvidenceFile,
     SourceFile,
+    discover_evidence_files,
     discover_exclusions,
     discover_sources,
 )
 from uac_parser.output.permissions import secure_file
-from uac_parser.output.writers import write_csv, write_json, write_jsonl, write_summary
+from uac_parser.output.writers import write_json, write_summary, write_timeline
 from uac_parser.parsers import (
     accounts,
     auditd,
     auth,
     bodyfile,
+    journal,
     persistence,
     privilege,
+    sqlite_log,
     ssh,
     syslog,
 )
 from uac_parser.parsers.account_diff import diff_accounts
+from uac_parser.parsers.common import UnsupportedCompressionError
 from uac_parser.parsers.login import parse_last_output
 from uac_parser.parsers.network import parse_netstat, parse_ss
 from uac_parser.parsers.processes import parse_ps
@@ -74,6 +93,7 @@ PARSER_DISPATCH = {
     "shell_history": parse_shell_history,
     "package_log": parse_package_log,
     "systemd": parse_systemd,
+    "journal_text": journal.parse,
     "systemd_unit": persistence.parse_systemd_unit,
     "web_log": parse_web_log,
     "login_history": parse_last_output,
@@ -92,6 +112,7 @@ PARSER_DISPATCH = {
     "ss_output": parse_ss,
     "netstat_output": parse_netstat,
     "ps_output": parse_ps,
+    "sqlite_log": sqlite_log.parse,
 }
 
 
@@ -123,8 +144,12 @@ class CollectionAnalysis:
     collection_host: str
     root: str
     sources: list[SourceFile]
+    evidence_inventory: list[EvidenceFile]
     excluded_files: list[dict[str, str]]
     collection_fingerprint: str
+    acquisition_time: str
+    input_record: dict[str, Any]
+    input_verification: dict[str, Any]
     full_events: list[TimelineEvent]
     mini_events: list[TimelineEvent]
     findings: list[dict[str, Any]]
@@ -176,6 +201,9 @@ class TimeRangeResult:
     range_basis: str
     source_types: list[str]
     excluded_files: int
+    evidence_files: int
+    unsupported_sources: int
+    unmatched_files: int
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -191,6 +219,9 @@ class TimeRangeResult:
             "range_basis": self.range_basis,
             "source_types": self.source_types,
             "excluded_files": self.excluded_files,
+            "evidence_files": self.evidence_files,
+            "unsupported_sources": self.unsupported_sources,
+            "unmatched_files": self.unmatched_files,
         }
 
 
@@ -200,34 +231,101 @@ def inspect_time_range(
     year: int | None = None,
     timezone_name: str = "UTC",
     host: str = "",
+    progress_callback: ProgressCallback | None = None,
+    collection_index: int = 1,
+    collection_total: int = 1,
+    collection_name: str = "",
+    scratch_dir: str | Path | None = None,
 ) -> TimeRangeResult:
     parser_errors: list[str] = []
-    loaded = load_input(str(input_path))
+    display_name = collection_name or Path(input_path).name
+    _emit_progress(
+        progress_callback,
+        stage="loading_collection",
+        collection_name=display_name,
+        collection_index=collection_index,
+        collection_total=collection_total,
+        completed=0,
+        total=1,
+    )
+    loaded = load_input(str(input_path), temp_parent=scratch_dir)
     try:
         sources = discover_sources(loaded.root)
-        excluded_files = discover_exclusions(loaded.root)
+        evidence_inventory = discover_evidence_files(loaded.root, sources)
+        excluded_files = [
+            *discover_exclusions(loaded.root),
+            *(loaded.archive_exclusions or []),
+        ]
+        _emit_progress(
+            progress_callback,
+            stage="sources_discovered",
+            collection_name=display_name,
+            collection_index=collection_index,
+            collection_total=collection_total,
+            completed=0,
+            total=len(sources),
+        )
         events = []
-        for source in sources:
+        for source_index, source in enumerate(sources, start=1):
+            _emit_progress(
+                progress_callback,
+                stage="parsing_sources",
+                collection_name=display_name,
+                collection_index=collection_index,
+                collection_total=collection_total,
+                source=source.relative,
+                completed=source_index - 1,
+                total=len(sources),
+            )
             parser = PARSER_DISPATCH.get(source.source_type)
             if not parser:
+                source.parser_status = "unsupported"
+                source.parser_error = _unsupported_source_reason(source.source_type)
                 continue
             try:
-                events.extend(_parse_source(parser, source, host, year, timezone_name))
+                parsed = _parse_source(parser, source, host, year, timezone_name)
+                events.extend(parsed)
+                source.parser_status = "parsed"
+                source.event_count = len(parsed)
+            except UnsupportedCompressionError as exc:
+                source.parser_status = "unsupported"
+                source.parser_error = str(exc)
             except Exception as exc:
+                source.parser_status = "error"
+                source.parser_error = f"{type(exc).__name__}: {exc}"
                 parser_errors.append(f"{source.relative}: {type(exc).__name__}: {exc}")
+            _emit_progress(
+                progress_callback,
+                stage="parsing_sources",
+                collection_name=display_name,
+                collection_index=collection_index,
+                collection_total=collection_total,
+                source=source.relative,
+                completed=source_index,
+                total=len(sources),
+            )
+        _sync_evidence_coverage(evidence_inventory, sources)
         try:
             events.extend(diff_accounts(loaded.root, host=host))
         except Exception as exc:
             parser_errors.append(f"account_diff: {type(exc).__name__}: {exc}")
-        events = enrich_events(events)
-        events = assign_event_ids(dedupe_events(sort_events(events)))
-        events = correlate_state_events(events)
+        # Inspection only needs timestamp and source coverage. Detection enrichment,
+        # state correlation, and event IDs are deferred to the analysis run.
         ordered = sort_events(dedupe_events(events))
         timed = [event for event in ordered if event.timestamp]
         log_timed = [event for event in timed if event.timestamp_type == "log_time"]
         range_events = log_timed or timed
         earliest = range_events[0] if range_events else None
         latest = range_events[-1] if range_events else None
+        _emit_progress(
+            progress_callback,
+            stage="collection_complete",
+            collection_name=display_name,
+            collection_index=collection_index,
+            collection_total=collection_total,
+            completed=1,
+            total=1,
+        )
         return TimeRangeResult(
             earliest=earliest.timestamp if earliest else None,
             latest=latest.timestamp if latest else None,
@@ -241,6 +339,14 @@ def inspect_time_range(
             range_basis="log_time" if log_timed else "timestamped_evidence",
             source_types=sorted({source.source_type for source in sources}),
             excluded_files=len(excluded_files),
+            evidence_files=len(evidence_inventory),
+            unsupported_sources=sum(
+                source.parser_status == "unsupported" for source in sources
+            ),
+            unmatched_files=sum(
+                evidence.coverage_status == "unmatched"
+                for evidence in evidence_inventory
+            ),
         )
     finally:
         loaded.cleanup()
@@ -257,6 +363,7 @@ def run_pipeline(
     host: str = "",
     iocs: list[Ioc] | None = None,
     threat_type: str = "",
+    case_reference: str = "",
     progress_callback: ProgressCallback | None = None,
 ) -> PipelineResult:
     output_dir = Path(out_dir).expanduser().resolve()
@@ -286,6 +393,30 @@ def run_pipeline(
         write_outputs=True,
         progress_callback=progress_callback,
     )
+    reference = case_reference.strip() or default_case_reference(
+        "TraceQuarry Collection",
+        analysis.collection_fingerprint,
+    )
+    custody_reference = _caseweave_custody_references(output_dir, [analysis])[
+        analysis.collection_id
+    ]
+    write_caseweave_bundle(
+        analysis.output,
+        collection_id=analysis.collection_id,
+        collection_name=analysis.collection_name,
+        collection_host=analysis.collection_host,
+        collection_fingerprint=analysis.collection_fingerprint,
+        acquisition_time=analysis.acquisition_time,
+        input_record=analysis.input_record,
+        custody_reference=custody_reference,
+        evidence_inventory=analysis.evidence_inventory,
+        events=analysis.full_events,
+        findings=analysis.findings,
+        case_reference=reference,
+        suggested_name=analysis.collection_name or "TraceQuarry Collection",
+        incident_type=threat_type,
+    )
+    _write_run_manifest(analysis, start, end, timezone_name, threat_type)
     return PipelineResult(
         output=output_dir,
         events=len(analysis.full_events),
@@ -308,10 +439,14 @@ def run_case_pipeline(
     iocs: list[Ioc] | None = None,
     case_name: str = "TraceQuarry Case",
     threat_type: str = "",
+    case_reference: str = "",
     progress_callback: ProgressCallback | None = None,
+    max_workers: int = 1,
 ) -> CasePipelineResult:
     if not inputs:
         raise ValueError("At least one UAC input is required for a case workspace.")
+    if max_workers < 1:
+        raise ValueError("Case workers must be at least one.")
     output_dir = Path(out_dir).expanduser().resolve()
     hosts_dir = output_dir / "hosts"
     hosts_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -325,12 +460,20 @@ def run_case_pipeline(
     threat_type = validate_profile(threat_type)
 
     used_ids: set[str] = set()
-    analyses: list[CollectionAnalysis] = []
+    collection_specs: list[tuple[int, str | Path, str, str, Path]] = []
     for index, input_path in enumerate(inputs, start=1):
         collection_name = _collection_name(input_path, index)
         collection_id = _collection_id(input_path, collection_name, index, used_ids)
         host_output = hosts_dir / collection_id
-        analysis = _run_collection(
+        collection_specs.append(
+            (index, input_path, collection_name, collection_id, host_output)
+        )
+
+    def analyze_collection(
+        spec: tuple[int, str | Path, str, str, Path],
+    ) -> tuple[int, CollectionAnalysis]:
+        index, input_path, collection_name, collection_id, host_output = spec
+        return index, _run_collection(
             input_path,
             host_output,
             start=start,
@@ -348,7 +491,25 @@ def run_case_pipeline(
             collection_index=index,
             collection_total=len(inputs),
         )
-        analyses.append(analysis)
+
+    analyses_by_index: dict[int, CollectionAnalysis] = {}
+    worker_count = min(max_workers, len(collection_specs))
+    if worker_count == 1:
+        for spec in collection_specs:
+            index, analysis = analyze_collection(spec)
+            analyses_by_index[index] = analysis
+    else:
+        with ThreadPoolExecutor(
+            max_workers=worker_count, thread_name_prefix="tracequarry-case"
+        ) as executor:
+            futures = {
+                executor.submit(analyze_collection, spec): spec[0]
+                for spec in collection_specs
+            }
+            for future in as_completed(futures):
+                index, analysis = future.result()
+                analyses_by_index[index] = analysis
+    analyses = [analyses_by_index[index] for index in range(1, len(inputs) + 1)]
 
     duplicate_groups = _duplicate_collection_groups(analyses)
     duplicate_ids = {
@@ -368,12 +529,10 @@ def run_case_pipeline(
         )
     )
     mini_events = filter_window(full_events, start, end) if (start or end) else []
-    case_events = assign_event_ids(
-        dedupe_events(
-            sort_events(
-                [event for analysis in case_analyses for event in analysis.full_events]
-            )
-        )
+    case_events = (
+        [event for event in full_events if event.collection_id not in duplicate_ids]
+        if duplicate_ids
+        else full_events
     )
     case_mini_events = filter_window(case_events, start, end) if (start or end) else []
     analysis_events = _analysis_scope(case_events, case_mini_events, bool(start or end))
@@ -397,11 +556,17 @@ def run_case_pipeline(
     for correlation in correlations:
         findings.append(_case_correlation_finding(correlation))
 
-    write_jsonl(output_dir / "case_timeline_full.jsonl", full_events)
-    write_csv(output_dir / "case_timeline_full.csv", full_events)
+    write_timeline(
+        output_dir / "case_timeline_full.jsonl",
+        output_dir / "case_timeline_full.csv",
+        full_events,
+    )
     if start or end:
-        write_jsonl(output_dir / "case_timeline_mini.jsonl", mini_events)
-        write_csv(output_dir / "case_timeline_mini.csv", mini_events)
+        write_timeline(
+            output_dir / "case_timeline_mini.jsonl",
+            output_dir / "case_timeline_mini.csv",
+            mini_events,
+        )
     write_json(
         output_dir / "case_findings.json",
         {"findings": findings, "storylines": storylines, "correlations": correlations},
@@ -429,7 +594,11 @@ def run_case_pipeline(
     )
     write_ioc_hits_with_prefix(output_dir, "case_ioc_hits", ioc_hits)
     write_summary(
-        output_dir / "case_summary.md", mini_events or full_events, findings, storylines
+        output_dir / "case_summary.md",
+        mini_events or full_events,
+        findings,
+        storylines,
+        context_events=full_events,
     )
     _append_case_summary(
         output_dir / "case_summary.md",
@@ -467,6 +636,33 @@ def run_case_pipeline(
         encoding="utf-8",
     )
     secure_file(case_errors_path)
+    resolved_case_reference = case_reference.strip() or default_case_reference(
+        case_name,
+        "|".join(sorted(analysis.collection_fingerprint for analysis in analyses)),
+    )
+    caseweave_exports = _write_caseweave_exports(
+        output_dir,
+        analyses,
+        resolved_case_reference,
+        case_name,
+        threat_type,
+    )
+    _refresh_collection_manifests(
+        analyses,
+        start,
+        end,
+        timezone_name,
+        threat_type,
+    )
+    write_json(
+        output_dir / "caseweave_exports.json",
+        {
+            "schema_name": "tracequarry.caseweave-export-index",
+            "schema_version": "1.0.0",
+            "case_reference": resolved_case_reference,
+            "exports": caseweave_exports,
+        },
+    )
     _write_case_manifest(
         output_dir,
         analyses,
@@ -498,6 +694,169 @@ def run_case_pipeline(
     )
 
 
+def _write_caseweave_exports(
+    output_dir: Path,
+    analyses: list[CollectionAnalysis],
+    case_reference: str,
+    case_name: str,
+    threat_type: str,
+) -> list[dict[str, Any]]:
+    exports = []
+    custody_by_collection = _caseweave_custody_references(output_dir, analyses)
+    for analysis in analyses:
+        export = write_caseweave_bundle(
+            analysis.output,
+            collection_id=analysis.collection_id,
+            collection_name=analysis.collection_name,
+            collection_host=analysis.collection_host,
+            collection_fingerprint=analysis.collection_fingerprint,
+            acquisition_time=analysis.acquisition_time,
+            input_record=analysis.input_record,
+            custody_reference=custody_by_collection[analysis.collection_id],
+            evidence_inventory=analysis.evidence_inventory,
+            events=analysis.full_events,
+            findings=analysis.findings,
+            case_reference=case_reference,
+            suggested_name=case_name,
+            incident_type=threat_type,
+        )
+        export["path"] = (
+            analysis.output.relative_to(output_dir) / str(export["path"])
+        ).as_posix()
+        if export.get("source_package_path"):
+            export["source_package_path"] = (
+                analysis.output.relative_to(output_dir)
+                / str(export["source_package_path"])
+            ).as_posix()
+        exports.append(export)
+    return exports
+
+
+def _refresh_collection_manifests(
+    analyses: list[CollectionAnalysis],
+    start: str | None,
+    end: str | None,
+    timezone_name: str,
+    threat_type: str,
+) -> None:
+    for analysis in analyses:
+        _write_run_manifest(analysis, start, end, timezone_name, threat_type)
+
+
+def _caseweave_custody_references(
+    output_dir: Path,
+    analyses: list[CollectionAnalysis],
+) -> dict[str, str]:
+    path = output_dir / "caseweave_custody.json"
+    records = _read_caseweave_custody_records(path)
+    assigned: dict[str, str] = {}
+    used: set[str] = set()
+    ordered = sorted(analyses, key=_custody_analysis_key)
+
+    for analysis in ordered:
+        metadata = _custody_metadata(analysis)
+        match = next(
+            (
+                record
+                for record in records
+                if record["custody_reference"] not in used
+                and all(record.get(key) == value for key, value in metadata.items())
+            ),
+            None,
+        )
+        if match:
+            reference = match["custody_reference"]
+            assigned[analysis.collection_id] = reference
+            used.add(reference)
+
+    for fingerprint in sorted({item.collection_fingerprint for item in analyses}):
+        pending = [
+            item
+            for item in ordered
+            if item.collection_fingerprint == fingerprint
+            and item.collection_id not in assigned
+        ]
+        available = sorted(
+            (
+                record
+                for record in records
+                if record.get("collection_fingerprint") == fingerprint
+                and record["custody_reference"] not in used
+            ),
+            key=lambda item: item["custody_reference"],
+        )
+        for analysis, record in zip(pending, available, strict=False):
+            reference = record["custody_reference"]
+            assigned[analysis.collection_id] = reference
+            used.add(reference)
+        for analysis in pending[len(available) :]:
+            reference = uuid4().hex
+            assigned[analysis.collection_id] = reference
+            used.add(reference)
+
+    by_reference: dict[str, dict[str, str]] = {
+        record["custody_reference"]: record for record in records
+    }
+    for analysis in analyses:
+        reference = assigned[analysis.collection_id]
+        by_reference[reference] = {
+            "custody_reference": reference,
+            **_custody_metadata(analysis),
+        }
+    registry_records = list(by_reference.values())
+    registry_records.sort(key=_custody_record_reference)
+    write_json(
+        path,
+        {
+            "schema_name": "tracequarry.caseweave-custody-registry",
+            "schema_version": "1.0.0",
+            "collections": registry_records,
+        },
+    )
+    return assigned
+
+
+def _read_caseweave_custody_records(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        records = payload["collections"]
+        if payload.get("schema_version") != "1.0.0" or not isinstance(records, list):
+            raise ValueError
+        output = []
+        for record in records:
+            if not isinstance(record, dict):
+                raise ValueError
+            normalized = {str(key): str(value) for key, value in record.items()}
+            reference = normalized.get("custody_reference", "")
+            if not re.fullmatch(r"[0-9a-f]{32}", reference):
+                raise ValueError
+            output.append(normalized)
+        return output
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Invalid CaseWeave custody registry: {path}") from exc
+
+
+def _custody_metadata(analysis: CollectionAnalysis) -> dict[str, str]:
+    return {
+        "collection_fingerprint": analysis.collection_fingerprint,
+        "collection_name": analysis.collection_name,
+        "collection_host": analysis.collection_host,
+        "acquisition_time": analysis.acquisition_time,
+        "source_package_sha256": str(analysis.input_record.get("sha256") or ""),
+    }
+
+
+def _custody_analysis_key(analysis: CollectionAnalysis) -> tuple[str, ...]:
+    metadata = _custody_metadata(analysis)
+    return (*metadata.values(), analysis.collection_id)
+
+
+def _custody_record_reference(record: dict[str, str]) -> str:
+    return record["custody_reference"]
+
+
 def _run_collection(
     input_path: str | Path,
     output_dir: Path,
@@ -520,10 +879,66 @@ def _run_collection(
     output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     output_dir.chmod(0o700)
     parser_errors: list[str] = []
-    loaded = load_input(str(input_path))
+    input_record = _input_record(input_path)
+    _emit_progress(
+        progress_callback,
+        stage="loading_collection",
+        collection_id=collection_id,
+        collection_name=collection_name or Path(input_path).name,
+        collection_index=collection_index,
+        collection_total=collection_total,
+        completed=0,
+        total=1,
+    )
+    loaded = load_input(str(input_path), temp_parent=output_dir)
     try:
+        _attach_loaded_input_metadata(input_record, loaded)
         sources = discover_sources(loaded.root)
-        excluded_files = discover_exclusions(loaded.root)
+        evidence_inventory = discover_evidence_files(loaded.root, sources)
+        _emit_progress(
+            progress_callback,
+            stage="hashing_evidence",
+            collection_id=collection_id,
+            collection_name=collection_name or Path(input_path).name,
+            collection_index=collection_index,
+            collection_total=collection_total,
+            completed=0,
+            total=len(evidence_inventory),
+        )
+        _hash_evidence_inventory(evidence_inventory)
+        excluded_files = [
+            *discover_exclusions(loaded.root),
+            *(loaded.archive_exclusions or []),
+        ]
+        non_regular_members = [
+            item for item in excluded_files if item.get("member_type")
+        ]
+        collection_fingerprint = _collection_fingerprint(
+            evidence_inventory,
+            non_regular_members,
+        )
+        if not collection_name:
+            collection_name = _collection_name(input_path, collection_index)
+        if not collection_id:
+            collection_id = _content_collection_id(
+                collection_name,
+                collection_fingerprint,
+            )
+        if not collection_input:
+            collection_input = str(Path(input_path).expanduser())
+        evidence_hashes = {
+            evidence.relative: evidence.sha256 for evidence in evidence_inventory
+        }
+        for source in sources:
+            source.sha256 = evidence_hashes.get(source.relative, "")
+        if input_record["kind"] == "directory":
+            input_record = _directory_input_record(
+                input_record,
+                evidence_inventory,
+                non_regular_members,
+            )
+        if non_regular_members:
+            input_record["archive_exclusions"] = non_regular_members
         _emit_progress(
             progress_callback,
             stage="sources_discovered",
@@ -536,20 +951,35 @@ def _run_collection(
         )
         events = []
         for source_index, source in enumerate(sources, start=1):
+            _emit_progress(
+                progress_callback,
+                stage="parsing_sources",
+                collection_id=collection_id,
+                collection_name=collection_name or Path(input_path).name,
+                collection_index=collection_index,
+                collection_total=collection_total,
+                source=source.relative,
+                completed=source_index - 1,
+                total=len(sources),
+            )
             parser = PARSER_DISPATCH.get(source.source_type)
             if not parser:
-                continue
-            try:
-                source.sha256 = _file_sha256(source.path)
-                parsed = _parse_source(parser, source, host, year, timezone_name)
-                events.extend(parsed)
-                source.parser_status = "parsed"
-                source.event_count = len(parsed)
-            except Exception as exc:
-                error = f"{type(exc).__name__}: {exc}"
-                source.parser_status = "error"
-                source.parser_error = error
-                parser_errors.append(f"{source.relative}: {error}")
+                source.parser_status = "unsupported"
+                source.parser_error = _unsupported_source_reason(source.source_type)
+            else:
+                try:
+                    parsed = _parse_source(parser, source, host, year, timezone_name)
+                    events.extend(parsed)
+                    source.parser_status = "parsed"
+                    source.event_count = len(parsed)
+                except UnsupportedCompressionError as exc:
+                    source.parser_status = "unsupported"
+                    source.parser_error = str(exc)
+                except Exception as exc:
+                    error = f"{type(exc).__name__}: {exc}"
+                    source.parser_status = "error"
+                    source.parser_error = error
+                    parser_errors.append(f"{source.relative}: {error}")
             _emit_progress(
                 progress_callback,
                 stage="parsing_sources",
@@ -561,11 +991,25 @@ def _run_collection(
                 completed=source_index,
                 total=len(sources),
             )
+        _sync_evidence_coverage(evidence_inventory, sources)
         try:
             diff_events = diff_accounts(loaded.root, host=host)
+            diff_events = _attach_derived_provenance(diff_events, evidence_hashes)
             events.extend(diff_events)
         except Exception as exc:
             parser_errors.append(f"account_diff: {type(exc).__name__}: {exc}")
+        acquisition_time = _collection_acquisition_time(input_path, timezone_name)
+        _emit_progress(
+            progress_callback,
+            stage="enriching_collection",
+            collection_id=collection_id,
+            collection_name=collection_name or Path(input_path).name,
+            collection_index=collection_index,
+            collection_total=collection_total,
+            completed=0,
+            total=1,
+        )
+        events = _anchor_observation_events(events, acquisition_time)
         collection_host = _collection_host(host, collection_name, collection_id, events)
         events = _attach_collection(
             events, collection_id, collection_name, collection_input, collection_host
@@ -573,6 +1017,7 @@ def _run_collection(
         events = enrich_events(events)
         events = assign_event_ids(dedupe_events(sort_events(events)))
         events = correlate_state_events(events)
+        events = enrich_attack_phases(events)
         events = _attach_original_event_ids(events)
         events = assign_event_ids(dedupe_events(sort_events(events)))
         full_events = sort_events(events)
@@ -587,6 +1032,17 @@ def _run_collection(
         if known_ioc_finding:
             findings.insert(0, known_ioc_finding)
         storylines = build_storylines(mini_events or full_events)
+        input_verification = _verify_input_evidence(
+            input_path,
+            input_record,
+            loaded.root,
+            evidence_inventory,
+            non_regular_members,
+        )
+        if input_verification["status"] != "verified":
+            parser_errors.append(
+                "evidence_verification: " + input_verification["summary"]
+            )
 
         analysis = CollectionAnalysis(
             collection_id=collection_id,
@@ -595,8 +1051,12 @@ def _run_collection(
             collection_host=collection_host,
             root=str(loaded.root),
             sources=sources,
+            evidence_inventory=evidence_inventory,
             excluded_files=excluded_files,
-            collection_fingerprint=_collection_fingerprint(sources),
+            collection_fingerprint=collection_fingerprint,
+            acquisition_time=acquisition_time,
+            input_record=input_record,
+            input_verification=input_verification,
             full_events=full_events,
             mini_events=mini_events,
             findings=findings,
@@ -606,12 +1066,30 @@ def _run_collection(
             output=output_dir,
         )
         if write_outputs:
+            _emit_progress(
+                progress_callback,
+                stage="writing_collection",
+                collection_id=collection_id,
+                collection_name=collection_name or Path(input_path).name,
+                collection_index=collection_index,
+                collection_total=collection_total,
+                completed=0,
+                total=1,
+            )
             _write_collection_outputs(
                 analysis, start, end, timezone_name, len(iocs), threat_type
             )
-            _write_run_manifest(
-                analysis, input_path, start, end, timezone_name, threat_type
-            )
+            _write_run_manifest(analysis, start, end, timezone_name, threat_type)
+        _emit_progress(
+            progress_callback,
+            stage="collection_complete",
+            collection_id=collection_id,
+            collection_name=collection_name or Path(input_path).name,
+            collection_index=collection_index,
+            collection_total=collection_total,
+            completed=1,
+            total=1,
+        )
         return analysis
     finally:
         loaded.cleanup()
@@ -626,11 +1104,17 @@ def _write_collection_outputs(
     threat_type: str,
 ) -> None:
     output_dir = analysis.output
-    write_jsonl(output_dir / "timeline_full.jsonl", analysis.full_events)
-    write_csv(output_dir / "timeline_full.csv", analysis.full_events)
+    write_timeline(
+        output_dir / "timeline_full.jsonl",
+        output_dir / "timeline_full.csv",
+        analysis.full_events,
+    )
     if start or end:
-        write_jsonl(output_dir / "timeline_mini.jsonl", analysis.mini_events)
-        write_csv(output_dir / "timeline_mini.csv", analysis.mini_events)
+        write_timeline(
+            output_dir / "timeline_mini.jsonl",
+            output_dir / "timeline_mini.csv",
+            analysis.mini_events,
+        )
     write_json(
         output_dir / "findings.json",
         {"findings": analysis.findings, "storylines": analysis.storylines},
@@ -643,7 +1127,13 @@ def _write_collection_outputs(
             "collection_name": analysis.collection_name,
             "collection_input": analysis.collection_input,
             "collection_host": analysis.collection_host,
+            "acquisition_time": analysis.acquisition_time,
+            "input": analysis.input_record,
+            "input_verification": analysis.input_verification,
             "sources": [_source_record(source) for source in analysis.sources],
+            "evidence_inventory": [
+                _evidence_record(evidence) for evidence in analysis.evidence_inventory
+            ],
             "excluded_files": analysis.excluded_files,
             "incident_start": start,
             "incident_end": end,
@@ -658,6 +1148,10 @@ def _write_collection_outputs(
         analysis.mini_events or analysis.full_events,
         analysis.findings,
         analysis.storylines,
+        context_events=analysis.full_events,
+    )
+    _append_evidence_coverage(
+        output_dir / "summary.md", analysis.evidence_inventory, analysis.sources
     )
     _clear_assisted_outputs(output_dir)
     if threat_type:
@@ -686,17 +1180,76 @@ def _parse_source(
     year: int | None,
     timezone_name: str,
 ) -> list[TimelineEvent]:
-    if source.source_type in {"auth_log", "syslog", "cron", "web_log", "login_history"}:
-        return parser(
+    if source.source_type in {
+        "auth_log",
+        "syslog",
+        "cron",
+        "web_log",
+        "login_history",
+        "journal_text",
+        "sqlite_log",
+    }:
+        parsed = parser(
             source.path,
             source.relative,
             host=host,
             year=year,
             timezone_name=timezone_name,
         )
-    if source.source_type in {"ss_output", "netstat_output", "ps_output"}:
-        return parser(source.path, source.relative, host=host)
-    return parser(source.path, source.relative, host=host)
+    else:
+        parsed = parser(source.path, source.relative, host=host)
+    return [
+        replace(
+            event,
+            source_sha256=source.sha256,
+            parser_version=__version__,
+            timestamp_precision=(
+                event.timestamp_precision
+                if event.timestamp_precision != "unknown"
+                else "second"
+                if event.timestamp
+                else "not_applicable"
+            ),
+            timestamp_confidence=(
+                event.timestamp_confidence
+                if event.timestamp_confidence != "medium" or event.timestamp
+                else "not_applicable"
+            ),
+        )
+        for event in parsed
+    ]
+
+
+def _attach_derived_provenance(
+    events: list[TimelineEvent], evidence_hashes: dict[str, str]
+) -> list[TimelineEvent]:
+    output = []
+    for event in events:
+        source_paths = [
+            part.strip().lstrip("/") for part in event.source_path.split(" vs ")
+        ]
+        hashes = {
+            source_path: evidence_hashes[source_path]
+            for source_path in source_paths
+            if source_path in evidence_hashes
+        }
+        combined = ""
+        if hashes:
+            payload = "\n".join(
+                f"{path}|{digest}" for path, digest in sorted(hashes.items())
+            )
+            combined = sha256(payload.encode("utf-8", "replace")).hexdigest()
+        output.append(
+            replace(
+                event,
+                source_sha256=combined,
+                parser_version=__version__,
+                timestamp_precision="second" if event.timestamp else "not_applicable",
+                timestamp_confidence="medium" if event.timestamp else "not_applicable",
+                extra={**event.extra, "derived_source_sha256s": hashes},
+            )
+        )
+    return output
 
 
 def _clear_assisted_outputs(output_dir: Path, *, prefix: str = "") -> None:
@@ -715,6 +1268,48 @@ def _collection_name(input_path: str | Path, index: int) -> str:
     return path.stem or f"collection-{index:02d}"
 
 
+def _collection_acquisition_time(input_path: str | Path, timezone_name: str) -> str:
+    match = re.search(r"(?<!\d)(20\d{12})(?!\d)", Path(input_path).name)
+    if not match:
+        return ""
+    try:
+        timezone: tzinfo = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = UTC
+    try:
+        observed = datetime.strptime(match.group(1), "%Y%m%d%H%M%S").replace(
+            tzinfo=timezone
+        )
+    except ValueError:
+        return ""
+    return observed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _anchor_observation_events(
+    events: list[TimelineEvent], acquisition_time: str
+) -> list[TimelineEvent]:
+    if not acquisition_time:
+        return events
+    anchored = []
+    for event in events:
+        if event.timestamp or event.evidence_role == "behavior":
+            anchored.append(event)
+            continue
+        anchored.append(
+            replace(
+                event,
+                time_start=event.time_start or acquisition_time,
+                time_end=event.time_end or acquisition_time,
+                timestamp_confidence="low",
+                extra={
+                    **event.extra,
+                    "observation_anchor": "uac_collection_filename",
+                },
+            )
+        )
+    return anchored
+
+
 def _collection_id(
     input_path: str | Path, name: str, index: int, used_ids: set[str]
 ) -> str:
@@ -728,6 +1323,14 @@ def _collection_id(
         candidate = f"{index:02d}-{slug[:30]}-{digest}-{len(used_ids) + 1}"
     used_ids.add(candidate)
     return candidate
+
+
+def _content_collection_id(name: str, fingerprint: str) -> str:
+    """Build a stable single-run collection ID from evidence, not its local path."""
+    slug = re.sub(r"[^a-zA-Z0-9_.-]+", "-", name.strip().lower()).strip("-._")
+    slug = slug or "collection"
+    digest = fingerprint or sha256(name.encode("utf-8", "replace")).hexdigest()
+    return f"{slug[:36]}-{digest[:12]}"
 
 
 def _collection_host(
@@ -833,6 +1436,9 @@ def _case_source_index(
                 "collection_name": analysis.collection_name,
                 "collection_input": analysis.collection_input,
                 "collection_host": analysis.collection_host,
+                "acquisition_time": analysis.acquisition_time,
+                "input": analysis.input_record,
+                "input_verification": analysis.input_verification,
                 "root": analysis.root,
                 "output": str(analysis.output),
                 "events": len(analysis.full_events),
@@ -840,6 +1446,10 @@ def _case_source_index(
                 "findings": len(analysis.findings),
                 "parser_errors": len(analysis.parser_errors),
                 "sources": [_source_record(source) for source in analysis.sources],
+                "evidence_inventory": [
+                    _evidence_record(evidence)
+                    for evidence in analysis.evidence_inventory
+                ],
                 "excluded_files": analysis.excluded_files,
                 "collection_fingerprint": analysis.collection_fingerprint,
             }
@@ -869,6 +1479,11 @@ def _append_case_summary(
             f"  - {analysis.collection_id}: host={analysis.collection_host}, "
             f"events={len(analysis.full_events)}, findings={len(analysis.findings)}"
         )
+    evidence_inventory = [
+        evidence for analysis in analyses for evidence in analysis.evidence_inventory
+    ]
+    sources = [source for analysis in analyses for source in analysis.sources]
+    lines.extend(_evidence_coverage_lines(evidence_inventory, sources))
     if duplicate_groups:
         lines.extend(["", "## Duplicate Collection Control"])
         for group in duplicate_groups:
@@ -887,6 +1502,61 @@ def _append_case_summary(
         lines.append("- No cross-collection correlations identified.")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     secure_file(path)
+
+
+def _append_evidence_coverage(
+    path: Path,
+    evidence_inventory: list[EvidenceFile],
+    sources: list[SourceFile],
+) -> None:
+    lines = path.read_text(encoding="utf-8", errors="replace").rstrip().splitlines()
+    lines.extend(_evidence_coverage_lines(evidence_inventory, sources))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    secure_file(path)
+
+
+def _evidence_coverage_lines(
+    evidence_inventory: list[EvidenceFile],
+    sources: list[SourceFile],
+) -> list[str]:
+    counts = {
+        status: sum(item.coverage_status == status for item in evidence_inventory)
+        for status in {
+            "parsed",
+            "partially_parsed",
+            "unsupported",
+            "unmatched",
+            "error",
+        }
+    }
+    lines = [
+        "",
+        "## Evidence Coverage",
+        f"- Evidence files inventoried: {len(evidence_inventory)}",
+        (
+            "- Parsed: {parsed}; partially parsed: {partially_parsed}; "
+            "unsupported: {unsupported}; unmatched: {unmatched}; failed: {error}"
+        ).format(**counts),
+    ]
+    unsupported = [
+        source for source in sources if source.parser_status == "unsupported"
+    ]
+    for source in unsupported[:10]:
+        lines.append(
+            f"  - Unsupported: `{source.relative}` ({source.source_type}) - "
+            f"{source.parser_error}"
+        )
+    if len(unsupported) > 10:
+        lines.append(
+            f"  - {len(unsupported) - 10} additional unsupported source view(s); "
+            "see source_index.json."
+        )
+    if counts["unmatched"]:
+        lines.append(
+            "- Unmatched files remain hashed in the evidence inventory and collection "
+            "fingerprint; see source_index.json for paths."
+        )
+    return lines
 
 
 def write_ioc_hits_with_prefix(
@@ -1024,41 +1694,51 @@ def _shared_user_correlations(events: list[TimelineEvent]) -> list[dict[str, Any
     return output
 
 
+SHARED_CORRELATION_TOOLS = (
+    "rclone",
+    "anydesk",
+    "teamviewer",
+    "rustdesk",
+    "screenconnect",
+    "logmein",
+    "chisel",
+    "frp",
+    "ngrok",
+    "cloudflared",
+    "xmrig",
+    "kubectl",
+    "docker",
+    "aws",
+    "gsutil",
+    "azcopy",
+)
+SHARED_CORRELATION_TOOL_PATTERN = re.compile(
+    rf"(?<![A-Za-z0-9_.-])({'|'.join(map(re.escape, SHARED_CORRELATION_TOOLS))})"
+    r"(?![A-Za-z0-9_.-])",
+    re.IGNORECASE,
+)
+
+
 def _shared_tool_correlations(events: list[TimelineEvent]) -> list[dict[str, Any]]:
-    tools = [
-        "rclone",
-        "anydesk",
-        "teamviewer",
-        "rustdesk",
-        "screenconnect",
-        "logmein",
-        "chisel",
-        "frp",
-        "ngrok",
-        "cloudflared",
-        "xmrig",
-        "kubectl",
-        "docker",
-        "aws",
-        "gsutil",
-        "azcopy",
-    ]
     output = []
-    for tool in tools:
-        pattern = re.compile(
-            rf"(?<![A-Za-z0-9_.-]){re.escape(tool)}(?![A-Za-z0-9_.-])", re.IGNORECASE
+    matches_by_tool: dict[str, list[TimelineEvent]] = {
+        tool: [] for tool in SHARED_CORRELATION_TOOLS
+    }
+    for event in events:
+        text = "\n".join(
+            filter(None, [event.command, event.file_path, event.summary, event.raw])
         )
-        matches = [
-            event
-            for event in events
-            if pattern.search(
-                "\n".join(
-                    filter(
-                        None, [event.command, event.file_path, event.summary, event.raw]
-                    )
-                )
-            )
-        ]
+        if not text:
+            continue
+        matched_tools = {
+            match.group(1).lower()
+            for match in SHARED_CORRELATION_TOOL_PATTERN.finditer(text)
+        }
+        for tool in matched_tools:
+            matches_by_tool[tool].append(event)
+
+    for tool in SHARED_CORRELATION_TOOLS:
+        matches = matches_by_tool[tool]
         collections = _collection_set(matches)
         if len(collections) < 2:
             continue
@@ -1118,11 +1798,11 @@ def _shared_path_correlations(events: list[TimelineEvent]) -> list[dict[str, Any
 def _cross_host_storyline_correlations(
     events: list[TimelineEvent],
 ) -> list[dict[str, Any]]:
-    high_events = [
+    high_events = sort_events(
         event
-        for event in sort_events(events)
+        for event in events
         if event.timestamp and event.severity in {"high", "critical"}
-    ]
+    )
     collections = _collection_set(high_events)
     if len(collections) < 2:
         return []
@@ -1173,6 +1853,65 @@ def _source_record(source: SourceFile) -> dict[str, Any]:
     }
 
 
+def _evidence_record(evidence: EvidenceFile) -> dict[str, Any]:
+    return {
+        "relative": evidence.relative,
+        "size": evidence.size,
+        "sha256": evidence.sha256,
+        "source_types": evidence.source_types,
+        "coverage_status": evidence.coverage_status,
+        "coverage_reason": evidence.coverage_reason,
+    }
+
+
+def _hash_evidence_inventory(evidence_inventory: list[EvidenceFile]) -> None:
+    for evidence in evidence_inventory:
+        evidence.sha256 = _file_sha256(evidence.path)
+
+
+def _sync_evidence_coverage(
+    evidence_inventory: list[EvidenceFile], sources: list[SourceFile]
+) -> None:
+    by_relative: dict[str, list[SourceFile]] = {}
+    for source in sources:
+        by_relative.setdefault(source.relative, []).append(source)
+    for evidence in evidence_inventory:
+        matched = by_relative.get(evidence.relative, [])
+        statuses = {source.parser_status for source in matched}
+        if not matched:
+            continue
+        if "error" in statuses:
+            evidence.coverage_status = "error"
+            evidence.coverage_reason = "At least one matched parser failed."
+        elif "parsed" in statuses:
+            evidence.coverage_status = (
+                "parsed" if statuses == {"parsed"} else "partially_parsed"
+            )
+            evidence.coverage_reason = (
+                "All matched parser views completed."
+                if evidence.coverage_status == "parsed"
+                else "A parser view completed while another view is unsupported."
+            )
+        elif statuses == {"unsupported"}:
+            evidence.coverage_status = "unsupported"
+            evidence.coverage_reason = "; ".join(
+                sorted({source.parser_error for source in matched})
+            )
+
+
+def _unsupported_source_reason(source_type: str) -> str:
+    return {
+        "journal_binary": (
+            "Native systemd journal databases require an external journal export; "
+            "TraceQuarry parses journalctl text exports without modifying the evidence."
+        ),
+        "login_binary": (
+            "Native wtmp, btmp, and lastlog databases require a platform-aware binary "
+            "decoder; collect corresponding last/lastb text output for this release."
+        ),
+    }.get(source_type, f"No parser is registered for source type {source_type}.")
+
+
 def _file_sha256(path: Path) -> str:
     digest = sha256()
     with path.open("rb") as handle:
@@ -1183,22 +1922,136 @@ def _file_sha256(path: Path) -> str:
 
 def _input_record(input_path: str | Path) -> dict[str, Any]:
     path = Path(input_path).expanduser().resolve()
+    kind = "directory"
+    if path.is_file():
+        kind = (
+            "archive"
+            if tarfile.is_tarfile(path) or zipfile.is_zipfile(path)
+            else "file"
+        )
     record: dict[str, Any] = {
         "path": str(path),
-        "kind": "directory" if path.is_dir() else "archive",
+        "kind": kind,
     }
     if path.is_file():
         record.update({"size": path.stat().st_size, "sha256": _file_sha256(path)})
     return record
 
 
-def _collection_fingerprint(sources: list[SourceFile]) -> str:
-    """Fingerprint discovered evidence while ignoring intentional parser aliases."""
-    records = {(source.relative, source.size, source.sha256) for source in sources}
+def _attach_loaded_input_metadata(
+    input_record: dict[str, Any], loaded: LoadedCase
+) -> None:
+    if loaded.member_prefix:
+        input_record["member_prefix"] = loaded.member_prefix
+    if loaded.archive_exclusions:
+        input_record["archive_exclusions"] = loaded.archive_exclusions
+
+
+def _directory_input_record(
+    record: dict[str, Any],
+    evidence_inventory: list[EvidenceFile],
+    non_regular_members: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        **record,
+        "files": len(evidence_inventory) + len(non_regular_members),
+        "size": sum(evidence.size for evidence in evidence_inventory)
+        + sum(int(item.get("byte_size") or 0) for item in non_regular_members),
+        "sha256": _collection_fingerprint(
+            evidence_inventory,
+            non_regular_members,
+        ),
+    }
+
+
+def _verify_input_evidence(
+    input_path: str | Path,
+    input_record: dict[str, Any],
+    root: Path,
+    expected_inventory: list[EvidenceFile],
+    expected_non_regular: list[dict[str, Any]],
+) -> dict[str, Any]:
+    path = Path(input_path).expanduser().resolve()
+    archive_unchanged = True
+    if path.is_file():
+        archive_unchanged = path.stat().st_size == input_record.get(
+            "size"
+        ) and _file_sha256(path) == input_record.get("sha256")
+    current = discover_evidence_files(root, discover_sources(root))
+    _hash_evidence_inventory(current)
+    expected = {item.relative: (item.size, item.sha256) for item in expected_inventory}
+    observed = {item.relative: (item.size, item.sha256) for item in current}
+    changed = sorted(
+        relative
+        for relative in set(expected) | set(observed)
+        if expected.get(relative) != observed.get(relative)
+    )
+    if path.is_dir():
+        expected_special = _non_regular_identity(expected_non_regular)
+        observed_special = _non_regular_identity(
+            [item for item in discover_exclusions(root) if item.get("member_type")]
+        )
+        changed.extend(
+            f"{relative} (non-regular)"
+            for relative in sorted(set(expected_special) | set(observed_special))
+            if expected_special.get(relative) != observed_special.get(relative)
+        )
+    verified = archive_unchanged and not changed
+    return {
+        "status": "verified" if verified else "changed_during_analysis",
+        "archive_unchanged": archive_unchanged,
+        "inventory_unchanged": not changed,
+        "changed_files": changed,
+        "summary": (
+            "Input file and extracted evidence inventory remained unchanged."
+            if verified and path.is_file()
+            else "Evidence directory inventory remained unchanged."
+            if verified
+            else "Input evidence changed while TraceQuarry was analyzing it."
+        ),
+    }
+
+
+def _non_regular_identity(
+    members: list[dict[str, Any]],
+) -> dict[str, tuple[str, str, str]]:
+    return {
+        str(member["relative"]): (
+            str(member.get("member_type") or "special"),
+            str(member.get("byte_size") or "0"),
+            str(member.get("sha256") or ""),
+        )
+        for member in members
+    }
+
+
+def _collection_fingerprint(
+    evidence_inventory: list[EvidenceFile],
+    non_regular_members: list[dict[str, Any]] | None = None,
+) -> str:
+    """Fingerprint every collected evidence file, including unsupported artifacts."""
+    records = {
+        (evidence.relative, evidence.size, evidence.sha256, "")
+        for evidence in evidence_inventory
+    }
+    records.update(
+        (
+            str(member["relative"]),
+            int(member.get("byte_size") or 0),
+            str(member.get("sha256") or ""),
+            str(member.get("member_type") or "special"),
+        )
+        for member in non_regular_members or []
+    )
     if not records:
         return ""
     payload = "\n".join(
-        f"{relative}|{size}|{digest}" for relative, size, digest in sorted(records)
+        "|".join(
+            [relative, str(size), digest, member_type]
+            if member_type
+            else [relative, str(size), digest]
+        )
+        for relative, size, digest, member_type in sorted(records)
     )
     return sha256(payload.encode("utf-8", "replace")).hexdigest()
 
@@ -1272,14 +2125,27 @@ def _output_records(
 
 def _rules_record() -> dict[str, Any]:
     path = registry_path()
-    if not path.exists():
-        return {"path": "", "sha256": "", "status": "not_found"}
-    return {"path": str(path), "sha256": _file_sha256(path), "status": "available"}
+    phase_path = attack_phase_registry_path()
+    record: dict[str, Any] = (
+        {"path": str(path), "sha256": _file_sha256(path), "status": "available"}
+        if path.exists()
+        else {"path": "", "sha256": "", "status": "not_found"}
+    )
+    record["attack_phases"] = (
+        {
+            "path": str(phase_path),
+            "sha256": _file_sha256(phase_path),
+            "status": "available",
+            **attack_phase_metadata(),
+        }
+        if phase_path.exists()
+        else {"path": "", "sha256": "", "status": "not_found"}
+    )
+    return record
 
 
 def _write_run_manifest(
     analysis: CollectionAnalysis,
-    input_path: str | Path,
     start: str | None,
     end: str | None,
     timezone_name: str,
@@ -1289,14 +2155,16 @@ def _write_run_manifest(
     write_json(
         path,
         {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "tracequarry_version": __version__,
             "python_version": platform.python_version(),
-            "input": _input_record(input_path),
+            "input": analysis.input_record,
+            "input_verification": analysis.input_verification,
             "collection_id": analysis.collection_id,
             "collection_name": analysis.collection_name,
             "collection_host": analysis.collection_host,
+            "acquisition_time": analysis.acquisition_time,
             "settings": {
                 "incident_start": start,
                 "incident_end": end,
@@ -1312,13 +2180,32 @@ def _write_run_manifest(
                 "sources_failed": sum(
                     source.parser_status == "error" for source in analysis.sources
                 ),
+                "sources_unsupported": sum(
+                    source.parser_status == "unsupported" for source in analysis.sources
+                ),
                 "source_types": sorted(
                     {source.source_type for source in analysis.sources}
                 ),
                 "events": len(analysis.full_events),
+                "evidence_files": len(analysis.evidence_inventory),
+                "evidence_files_parsed": sum(
+                    evidence.coverage_status in {"parsed", "partially_parsed"}
+                    for evidence in analysis.evidence_inventory
+                ),
+                "evidence_files_unsupported": sum(
+                    evidence.coverage_status == "unsupported"
+                    for evidence in analysis.evidence_inventory
+                ),
+                "evidence_files_unmatched": sum(
+                    evidence.coverage_status == "unmatched"
+                    for evidence in analysis.evidence_inventory
+                ),
                 "excluded_files": len(analysis.excluded_files),
             },
             "sources": [_source_record(source) for source in analysis.sources],
+            "evidence_inventory": [
+                _evidence_record(evidence) for evidence in analysis.evidence_inventory
+            ],
             "excluded_files": analysis.excluded_files,
             "collection_fingerprint": analysis.collection_fingerprint,
             "outputs": _output_records(analysis.output, exclude={path.name}),
@@ -1340,7 +2227,7 @@ def _write_case_manifest(
     write_json(
         path,
         {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "tracequarry_version": __version__,
             "case_name": case_name,
@@ -1357,9 +2244,12 @@ def _write_case_manifest(
                     "collection_id": analysis.collection_id,
                     "collection_name": analysis.collection_name,
                     "collection_host": analysis.collection_host,
-                    "input": _input_record(analysis.collection_input),
+                    "acquisition_time": analysis.acquisition_time,
+                    "input": analysis.input_record,
+                    "input_verification": analysis.input_verification,
                     "events": len(analysis.full_events),
                     "sources": len(analysis.sources),
+                    "evidence_files": len(analysis.evidence_inventory),
                     "parser_errors": len(analysis.parser_errors),
                     "excluded_files": analysis.excluded_files,
                     "collection_fingerprint": analysis.collection_fingerprint,

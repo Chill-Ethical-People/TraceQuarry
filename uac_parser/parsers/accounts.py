@@ -42,6 +42,7 @@ def parse_passwd(path: Path, relative: str, host: str = "") -> list[TimelineEven
         event = TimelineEvent(
             timestamp="",
             timestamp_type="state_observed",
+            evidence_role="state_observation",
             timezone_confidence="missing",
             host=host,
             source_path=relative,
@@ -60,7 +61,7 @@ def parse_passwd(path: Path, relative: str, host: str = "") -> list[TimelineEven
             raw=raw,
             detection_names=detections,
             ttp_flags=detections,
-            mitre=["T1136.001"] if detections else [],
+            mitre_candidates=["T1136.001"] if detections else [],
             extra={"comment": comment, "home": home, "shell": shell},
         )
         events.append(event)
@@ -92,18 +93,19 @@ def parse_shadow(path: Path, relative: str, host: str = "") -> list[TimelineEven
         timestamp = _shadow_day_to_iso(last_change_day)
         detections = []
         severity = "informational"
-        if pwd_hash and pwd_hash not in {"*", "!", "!!", "x"}:
-            detections.append("local_password_hash_present")
-            severity = "low"
         if pwd_hash.startswith("$1$"):
             detections.append("weak_md5_password_hash")
             severity = "medium"
         events.append(
             TimelineEvent(
                 timestamp=timestamp,
+                timestamp_raw=last_change_day,
                 timestamp_type="password_change_time"
                 if timestamp
                 else "state_observed",
+                timestamp_precision="day" if timestamp else "not_applicable",
+                timestamp_confidence="high" if timestamp else "not_applicable",
+                evidence_role="state_observation",
                 timezone="UTC",
                 timezone_confidence="source_epoch" if timestamp else "missing",
                 host=host,
@@ -119,7 +121,6 @@ def parse_shadow(path: Path, relative: str, host: str = "") -> list[TimelineEven
                 tags=["account", "shadow"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1003.008"] if detections else [],
                 summary=f"Password state observed for {user} (last changed: {last_change_day}d)",
                 raw="[shadow hash redacted]",
                 extra={
@@ -168,6 +169,7 @@ def parse_group(path: Path, relative: str, host: str = "") -> list[TimelineEvent
             TimelineEvent(
                 timestamp="",
                 timestamp_type="state_observed",
+                evidence_role="state_observation",
                 timezone_confidence="missing",
                 host=host,
                 source_path=relative,
@@ -182,7 +184,7 @@ def parse_group(path: Path, relative: str, host: str = "") -> list[TimelineEvent
                 tags=["account", "group"],
                 detection_names=detections,
                 ttp_flags=detections,
-                mitre=["T1611", "T1548"] if detections else [],
+                mitre_candidates=["T1611", "T1548"] if detections else [],
                 summary=f"Group observed: {group} members={members}",
                 raw=raw,
                 extra={"group": group, "members": member_list},

@@ -17,13 +17,19 @@ from uac_parser.pipeline import (
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="uac-timeline",
-        description="TraceQuarry: parse UAC collections into normalized Linux forensic timelines with TTP enrichment.",
+        prog="tracequarry",
+        description=(
+            "Parse UAC collections, Linux logs, and supported SQLite evidence "
+            "into normalized forensic timelines with TTP enrichment."
+        ),
     )
     parser.add_argument(
         "input",
         nargs="?",
-        help="UAC archive (.tar, .tar.gz, .tgz, .zip) or extracted directory",
+        help=(
+            "UAC archive, extracted collection, copied Linux log directory, "
+            "loose/compressed log, or supported SQLite database"
+        ),
     )
     parser.add_argument("--out", help="Output directory for single-collection mode")
     parser.add_argument(
@@ -31,11 +37,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="append",
         dest="case_inputs",
         default=[],
-        help="UAC input for case mode. Repeat for multiple collections.",
+        help="Evidence input for case mode. Repeat for multiple collections.",
     )
     parser.add_argument(
         "--input-manifest",
-        help="Text file of UAC inputs for case mode. One archive or directory per line.",
+        help="Text file of evidence inputs for case mode. One path per line.",
     )
     parser.add_argument(
         "--case-out", help="Output directory for multi-collection case workspace"
@@ -44,6 +50,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--case-name",
         default="TraceQuarry Case",
         help="Case name for multi-collection summaries",
+    )
+    parser.add_argument(
+        "--case-reference",
+        default="",
+        help=(
+            "Immutable CaseWeave case reference. When omitted, TraceQuarry derives "
+            "a stable TQ-prefixed reference."
+        ),
+    )
+    parser.add_argument(
+        "--case-workers",
+        type=int,
+        default=1,
+        help="Collections parsed concurrently in case mode (default: 1)",
     )
     parser.add_argument(
         "--incident-start",
@@ -112,7 +132,9 @@ def main(argv: list[str] | None = None) -> int:
                 host=args.host,
                 iocs=iocs,
                 case_name=args.case_name,
+                case_reference=args.case_reference,
                 threat_type=args.threat_type,
+                max_workers=args.case_workers,
             )
         else:
             if not args.input:
@@ -129,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
                 host=args.host,
                 iocs=iocs,
                 threat_type=args.threat_type,
+                case_reference=args.case_reference,
             )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import binascii
 import re
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 from uac_parser.timeline.event import TimelineEvent
@@ -13,7 +13,9 @@ from .common import read_text_lines
 AUDIT_RE = re.compile(
     r"type=(?P<type>\w+)\s+msg=audit\((?P<epoch>\d+\.\d+):(?P<id>\d+)\):\s*(?P<body>.*)"
 )
+NODE_RE = re.compile(r"(?:^|\s)node=(?P<node>\S+)")
 KV_RE = re.compile(r"(\w+)=(\"[^\"]*\"|\S+)")
+MAX_PENDING_AUDIT_EVENTS = 4096
 
 
 def _kv(body: str) -> dict[str, str]:
@@ -42,80 +44,110 @@ def _decode_audit_value(value: str | None) -> str | None:
 
 
 def parse(path: Path, relative: str, host: str = "") -> list[TimelineEvent]:
-    grouped: dict[str, list[tuple[str, str, str, str]]] = defaultdict(list)
+    grouped: OrderedDict[tuple[str, str, str], list[tuple[str, str, str, str]]] = (
+        OrderedDict()
+    )
+    events: list[TimelineEvent] = []
     for raw in read_text_lines(path):
         match = AUDIT_RE.search(raw)
         if not match:
             continue
-        grouped[match.group("id")].append(
+        node_match = NODE_RE.search(raw)
+        node = node_match.group("node") if node_match else ""
+        key = (node, match.group("epoch"), match.group("id"))
+        grouped.setdefault(key, []).append(
             (match.group("type"), match.group("epoch"), match.group("body"), raw)
         )
-    events: list[TimelineEvent] = []
-    for audit_id, records in grouped.items():
-        timestamp = parse_epoch(records[0][1])
-        if not timestamp:
-            continue
-        by_type: dict[str, list[dict[str, str]]] = defaultdict(list)
-        raw_lines = []
-        for audit_type, _epoch, body, raw in records:
-            by_type[audit_type].append(_kv(body))
-            raw_lines.append(raw)
-        fields = {}
-        for type_fields in by_type.values():
-            for item in type_fields:
-                fields.update(item)
-        event_type = _primary_type(by_type)
-        action, category, severity, mitre, tags, detections = _classify(
-            event_type, by_type, fields
-        )
-        command = _command_from_records(by_type, fields)
-        file_path = _path_from_records(by_type)
-        event = TimelineEvent(
-            timestamp=timestamp,
-            timestamp_raw=records[0][1],
-            timezone="UTC",
-            timezone_confidence="source_epoch",
-            timestamp_type="log_time",
-            host=host,
-            source_path=relative,
-            source_type="auditd",
-            parser="auditd",
-            event_category=category,
-            event_action=action,
-            uid=fields.get("uid"),
-            user=fields.get("acct") or fields.get("auid"),
-            process=fields.get("comm") or fields.get("exe"),
-            pid=fields.get("pid"),
-            src_ip=fields.get("addr"),
-            file_path=file_path,
-            command=command,
-            mitre=mitre,
-            severity=severity,
-            confidence="medium",
-            tags=tags,
-            detection_names=detections,
-            ttp_flags=detections,
-            summary=f"Audit {event_type}: {command or file_path or fields.get('exe') or ''}".strip(),
-            raw="\n".join(raw_lines),
-            extra={
-                "audit_id": audit_id,
-                "record_types": sorted(by_type),
-                "fields": fields,
-                "auid": fields.get("auid"),
-                "session": fields.get("ses"),
-                "terminal": fields.get("terminal") or fields.get("tty"),
-                "result": fields.get("res") or fields.get("success"),
-                "syscall": fields.get("syscall"),
-            },
-        )
-        if key := fields.get("key"):
-            event.tags.append(f"audit_key:{key}")
-            event.detection_names.extend(_detections_from_key(key))
-            event.ttp_flags.extend(_detections_from_key(key))
-            event.detection_names = sorted(set(event.detection_names))
-            event.ttp_flags = sorted(set(event.ttp_flags))
-        events.append(event)
+        grouped.move_to_end(key)
+        if match.group("type") == "EOE":
+            records = grouped.pop(key)
+            if event := _event_from_records(key, records, relative, host):
+                events.append(event)
+        elif len(grouped) > MAX_PENDING_AUDIT_EVENTS:
+            oldest_key, records = grouped.popitem(last=False)
+            if event := _event_from_records(oldest_key, records, relative, host):
+                events.append(event)
+    for key, records in grouped.items():
+        if event := _event_from_records(key, records, relative, host):
+            events.append(event)
     return events
+
+
+def _event_from_records(
+    audit_key: tuple[str, str, str],
+    records: list[tuple[str, str, str, str]],
+    relative: str,
+    host: str,
+) -> TimelineEvent | None:
+    node, epoch, audit_id = audit_key
+    timestamp = parse_epoch(epoch)
+    if not timestamp:
+        return None
+    by_type: dict[str, list[dict[str, str]]] = defaultdict(list)
+    raw_lines = []
+    for audit_type, _epoch, body, raw in records:
+        by_type[audit_type].append(_kv(body))
+        raw_lines.append(raw)
+    fields: dict[str, str] = {}
+    for type_fields in by_type.values():
+        for item in type_fields:
+            fields.update(item)
+    event_type = _primary_type(by_type)
+    action, category, severity, mitre, tags, detections = _classify(
+        event_type, by_type, fields
+    )
+    command = _command_from_records(by_type, fields)
+    file_path = _path_from_records(by_type)
+    event = TimelineEvent(
+        timestamp=timestamp,
+        timestamp_raw=epoch,
+        timezone="UTC",
+        timezone_confidence="source_epoch",
+        timestamp_type="log_time",
+        evidence_role="behavior",
+        host=host or node,
+        source_path=relative,
+        source_type="auditd",
+        parser="auditd",
+        event_category=category,
+        event_action=action,
+        uid=fields.get("uid"),
+        user=fields.get("acct") or fields.get("auid"),
+        process=fields.get("comm") or fields.get("exe"),
+        pid=fields.get("pid"),
+        src_ip=fields.get("addr"),
+        file_path=file_path,
+        command=command,
+        mitre=mitre,
+        severity=severity,
+        confidence="medium",
+        tags=tags,
+        detection_names=detections,
+        ttp_flags=detections,
+        summary=(
+            f"Audit {event_type}: {command or file_path or fields.get('exe') or ''}"
+        ).strip(),
+        raw="\n".join(raw_lines),
+        extra={
+            "audit_id": audit_id,
+            "audit_node": node,
+            "audit_epoch": epoch,
+            "record_types": sorted(by_type),
+            "fields": fields,
+            "auid": fields.get("auid"),
+            "session": fields.get("ses"),
+            "terminal": fields.get("terminal") or fields.get("tty"),
+            "result": fields.get("res") or fields.get("success"),
+            "syscall": fields.get("syscall"),
+        },
+    )
+    if rule_key := fields.get("key"):
+        event.tags.append(f"audit_key:{rule_key}")
+        event.detection_names.extend(_detections_from_key(rule_key))
+        event.ttp_flags.extend(_detections_from_key(rule_key))
+        event.detection_names = sorted(set(event.detection_names))
+        event.ttp_flags = sorted(set(event.ttp_flags))
+    return event
 
 
 def _primary_type(by_type: dict[str, list[dict[str, str]]]) -> str:

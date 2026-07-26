@@ -47,3 +47,12 @@ class TimelineEngineTests(unittest.TestCase):
         )
 
         self.assertNotEqual(root.event_id, evilroot.event_id)
+
+    def test_existing_event_id_collision_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "collision"):
+            assign_event_ids(
+                [
+                    TimelineEvent(event_id="evt_fixed", raw="first"),
+                    TimelineEvent(event_id="evt_fixed", raw="second"),
+                ]
+            )
