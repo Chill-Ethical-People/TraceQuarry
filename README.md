@@ -98,15 +98,17 @@ arbitrary source mappings remain outside the public-beta interface.
 
 <p align="center">
   <a href="docs/media/tracequarry-walkthrough.webm">
-    <img src="docs/media/tracequarry-walkthrough.gif" width="960" alt="TraceQuarry guided walkthrough showing synthetic UAC intake, time-range inspection, assisted investigation, findings, raw timeline evidence, and analyst annotation">
+    <img src="docs/media/tracequarry-walkthrough.gif" width="960" alt="TraceQuarry guided walkthrough showing multi-collection Linux evidence intake, assisted investigation, per-collection progress, ATT&CK briefing, raw evidence review, analyst annotation, and export">
   </a>
 </p>
 
-This 28-second cursor-driven walkthrough uses the bundled synthetic fixture. It
-demonstrates archive intake, investigation-profile selection, evidence-range
-inspection, incident settings and IoCs, Live Run progress, summary review,
-raw-event validation, and analyst annotation through a natural browser workflow.
-Select the preview to open the
+This 60-second cursor-driven walkthrough uses two bundled synthetic collections.
+It demonstrates multi-archive intake, case metadata, assisted-investigation
+selection, evidence-range inspection, incident IoCs, per-collection Live Run
+status, summary review, the ATT&CK-aware incident briefing, raw-record validation,
+analyst promotion into the reconstructed chronology, and investigation export.
+All displayed hosts, indicators, and activity are synthetic. Select the preview
+to open the
 [full-resolution WebM video](docs/media/tracequarry-walkthrough.webm).
 
 ## Why Analysts Use TraceQuarry
