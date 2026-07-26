@@ -20,7 +20,7 @@ Case workspaces also contain `hosts/<collection_id>/` with complete
 per-collection output and `case_correlation.json` with structured cross-host
 relationships. Preserve both levels for traceability.
 
-## Timeline Schema 1.1
+## Timeline Schema 1.2
 
 Use these fields when validating or exporting events:
 
@@ -40,10 +40,22 @@ Use these fields when validating or exporting events:
   normalized event representation.
 - `mitre`: behavior-supported ATT&CK mappings.
 - `mitre_candidates`: ATT&CK hypotheses requiring analyst corroboration.
+- `attack_phases`: ATT&CK tactics derived from behavior-supported technique IDs.
+- `attack_phase_candidates`: tactics derived only from candidate technique IDs.
 - `detection_names`, `ttp_flags`, `tags`: triage labels, not conclusions.
 - `severity`, `confidence`: parser prioritization; reassess after raw validation.
 - `summary`, `raw`, `extra`: normalized explanation, source content, and
   parser-specific context.
+
+The GUI review export adds `summary_selection`. `Summary` means an analyst chose
+the event for the reconstructed chronology; blank means the event remains in the
+full evidence set but was not promoted. This selection is review metadata, not a
+parser finding, and is recorded in the analyst audit chain.
+
+The investigation workbook export provides `Executive Briefing`,
+`Selected Timeline`, one or more normalized `Timeline` sheets, and `Findings`.
+Treat the executive sheet as a review aid: every promoted milestone should retain
+an event ID, source path, source SHA-256, and raw record in the workbook.
 
 ## Evidence Roles
 

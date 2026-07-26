@@ -1,7 +1,5 @@
 # TraceQuarry
 
-
-
 <p align="center">
   <img src="assets/tracequarry-favicon.svg" width="168" alt="TraceQuarry layered timeline mark">
 </p>
@@ -14,13 +12,66 @@
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
 
-TraceQuarry is a local-first Linux DFIR workbench for
-[Unix-like Artifacts Collector (UAC)](https://github.com/tclahr/uac) evidence.
-It converts a UAC archive or extracted UAC directory into defensible incident
-timelines, source coverage indexes, IoC hits, and high-signal findings for
-responder review.
+> **Public beta 0.4.0-beta.2:** an open-source Linux DFIR timeline parser for
+> UAC collections, native Linux logs, and supported SQLite forensic data.
+> Read the [0.4.0-beta.2 release notes](docs/releases/v0.4.0-beta.2.md).
+
+TraceQuarry is a local-first Linux digital forensics and incident response
+(DFIR) workbench. It converts
+[Unix-like Artifacts Collector (UAC)](https://github.com/tclahr/uac) archives,
+copied `/var/log` trees, compressed or rotated Linux logs, and supported SQLite
+databases into normalized forensic timelines, source coverage indexes, IoC
+matches, MITRE ATT&CK context, and evidence-backed findings.
 
 Tagline: **Excavate the timeline. Preserve the proof.**
+
+## What Is TraceQuarry?
+
+TraceQuarry helps incident responders reconstruct activity on Linux systems
+without sending evidence to a hosted service. It preserves raw log context and
+source provenance while organizing authentication, execution, persistence,
+privilege escalation, credential access, discovery, lateral movement,
+exfiltration, and impact signals into analyst-reviewable outputs.
+
+| Area | Public beta capability |
+| --- | --- |
+| Product category | Open-source Linux forensic timeline parser and DFIR triage workbench |
+| Evidence inputs | UAC archives and directories, copied Linux logs, compressed rotations, and supported SQLite databases |
+| Investigation outputs | CSV and JSONL timelines, findings, IoC hits, source coverage, incident summaries, and XLSX briefing workbooks |
+| Analysis | Assisted investigation profiles, MITRE ATT&CK phase tagging, tool/TTP enrichment, and cross-collection correlation |
+| Interfaces | Command-line interface and loopback-only local web GUI |
+| Evidence privacy | Local processing; no external evidence upload is required |
+| Release status | Public beta for responder testing and feedback |
+
+## Public Beta Highlights
+
+- Build one defensible UTC-normalized timeline from a UAC collection or loose
+  Linux evidence while retaining raw records, source paths, hashes, timestamp
+  confidence, and collection provenance.
+- Combine multiple collections into a case workspace with per-host outputs,
+  cross-host correlation, case summaries, and bounded parallel parsing.
+- Review and tag evidence interactively, promote pivotal events into a concise
+  reconstructed chronology, and export CSV, JSONL, Markdown, or an investigation
+  workbook with an executive briefing.
+- Stage large browser cases with per-file hashing, retryable uploads, queue
+  filters, and visible pending, uploading, parsing, completed, and failed states.
+- Extend community detection coverage through versioned YAML registries for
+  tools, malware and payload signals, TTPs, ATT&CK phases, and non-attributive
+  actor-profile similarity.
+
+## Coming Next: CaseWeave Integration
+
+TraceQuarry and CaseWeave are being designed to connect forensic collection
+triage with collaborative incident reconstruction. The intended workflow will
+let TraceQuarry hand evidence-backed timeline and finding candidates to
+CaseWeave while preserving package hashes, collection custody, source locators,
+omission accounting, and the boundary between automated suggestions and analyst
+decisions.
+
+The current TraceQuarry build emits an **experimental developer-preview bundle**
+for contract testing. The CaseWeave importer and end-to-end user integration are
+pending their own public release and are not part of TraceQuarry's supported
+public-beta workflow yet. Follow the project for the full integration.
 
 ## Relationship To UAC
 
@@ -38,10 +89,10 @@ UAC itself. Report parsing, normalization, enrichment, timeline, and TraceQuarry
 GUI issues in the [TraceQuarry issue tracker](https://github.com/Chill-Ethical-People/TraceQuarry/issues).
 Never attach real incident collections or sensitive evidence to a public issue.
 
-TraceQuarry can also process an extracted directory or archive containing
-recognizably named Linux logs, even when it was not produced by UAC. Generic log
-intake is currently filename- and format-driven; arbitrary source mappings and
-single-log-file intake are not yet first-class interfaces.
+TraceQuarry can also process an extracted directory, archive, individual Linux
+log, compressed rotation, or supported SQLite database even when it was not
+produced by UAC. Generic evidence intake is filename- and format-driven;
+arbitrary source mappings remain outside the public-beta interface.
 
 ## Guided Walkthrough
 
@@ -171,7 +222,7 @@ encrypted volume when the collection contains sensitive material.
 1. Inspect the archive time range.
 
 ```bash
-cd tracequarry
+cd TraceQuarry
 python3 -m uac_parser.web --host 127.0.0.1 --port 8765 \
   --work-dir web_runs \
   --input-root /cases
@@ -228,10 +279,37 @@ selected profile and generated output hashes are preserved in the run manifest.
 
 Completed GUI jobs also provide **Explore Timeline**. The evidence explorer
 pages through the incident-window or full JSONL timeline, supports text,
-severity, and source-type filtering, and displays the original raw record with
-host and collection provenance. Analyst dispositions, tags, and notes are saved
+severity, source-type, ATT&CK phase, and analyst-summary filtering, and displays
+the original raw record with host and collection provenance. Analyst
+dispositions, tags, notes, and summary selections are saved
 to `analyst_annotations.json`; they never modify the parser timeline or source
-evidence.
+evidence. Every annotation change is also written to the SHA-256 hash-chained
+`analyst_audit.jsonl`; `/api/job/<job-id>/audit` verifies its current chain
+status. Guided tags cover lateral movement, persistence, execution,
+exfiltration, credential harvesting, and discovery/reconnaissance.
+
+Use **Include in reconstructed summary** sparingly to promote a pivotal,
+raw-validated event into the consultant's concise chronology. This binary review
+decision appears as `Summary` in the exported `summary_selection` column. It does
+not overwrite the event's descriptive `summary` field or remove unselected
+evidence. **Incident Briefing** orders the selected records by UTC time and keeps
+the event ID, source path, source SHA-256, raw excerpt, analyst note, and ATT&CK
+phase visible. **Export Timeline CSV** can export the full review set or only the
+selected summary chronology. **Export Investigation XLSX** creates a review
+workbook with these linked sheets:
+
+- `Executive Briefing`: incident milestones, key metrics, observed actions,
+  exfiltration/impact/account callouts, ATT&CK distribution, legal-review note,
+  and an evidence-qualified executive summary.
+- `Selected Timeline`: the analyst-promoted chronology with raw evidence and
+  provenance.
+- `Timeline` (and additional numbered sheets above Excel's row limit): the
+  normalized timeline and analyst columns.
+- `Findings`: parser findings with severity, confidence, tags, IoCs, and related
+  event IDs.
+
+The same executive briefing is previewed in the GUI before export. Spreadsheet
+formula and automatic hyperlink interpretation are disabled for evidence values.
 
 ## Choosing Time Settings
 
@@ -272,8 +350,9 @@ For incident response, review outputs in this order:
    keys, and bodyfile data were present.
 
 3. `summary.md`
-   Read the responder summary for high-level findings, lateral movement notes,
-   account lifecycle changes, brute-force summaries, and storylines.
+   Read the responder summary for high-level findings, ATT&CK phase distribution,
+   lateral movement notes, account lifecycle changes, brute-force summaries, and
+   storylines.
 
 4. `findings.json`
    Treat this as the queue of high-signal leads. Pivot each important finding to
@@ -283,7 +362,7 @@ For incident response, review outputs in this order:
 5. `timeline_mini.csv`
    Use this as the main analyst timeline for the suspected incident window.
    Filter by `severity`, `event_category`, `event_action`, `user`, `src_ip`,
-   `process`, `command`, `ttp`, and `source_path`.
+   `process`, `command`, `attack_phases`, `mitre`, and `source_path`.
 
 6. `timeline_full.csv`
    Use this when the mini timeline shows suspicious activity at the edge of the
@@ -309,12 +388,24 @@ TraceQuarry writes the following files into the selected output directory:
 - `source_index.json`: complete evidence inventory, source hashes, parser status,
   unsupported formats, unmatched files, input verification, and parse coverage
 - `parser_errors.log`: non-fatal parser errors for analyst review
+- `analyst_annotations.json` and `analyst_audit.jsonl`: GUI review state and its
+  ordered, hash-chained local audit history
 - `run_manifest.json`: input identity, source hashes, parser coverage, rule fingerprint,
   complete-collection fingerprint, input integrity verification, execution
   settings, and output hashes for reproducibility
 - `assisted_investigation.md` and `.json`: hypothesis-led priorities, readiness,
   checklist status, evidence references, guardrails, and analyst pivots when a
   threat profile was selected
+- `caseweave_import_bundle.zip`: an experimental CaseWeave developer-preview
+  handoff containing
+  normalized events plus evidence-backed timeline and finding candidates; it
+  never represents producer output as an analyst confirmation. The bundle also
+  carries content-derived IDs, external source-package references, and a hashed
+  omission ledger for records that cannot meet the exchange provenance contract
+- `caseweave_source_package.tar`: experimental deterministic source package for
+  validating external member references in the preview contract
+- `caseweave_custody.json`: experimental durable custody identities used to
+  validate retries and distinct byte-identical acquisitions
 
 For multi-collection case workspaces, TraceQuarry also writes:
 
@@ -329,11 +420,18 @@ For multi-collection case workspaces, TraceQuarry also writes:
 - `case_source_index.json`: per-collection source coverage and provenance
 - `case_parser_errors.log`: parser errors grouped by collection
 - `case_manifest.json`: case-level collection identity, settings, rules, and output hashes
+- `caseweave_exports.json`: index of the per-collection CaseWeave bundles under
+  portable relative `hosts/<collection_id>/caseweave_import_bundle.zip` paths
+
+These CaseWeave files are contract-validation previews, not a released
+end-to-end integration. The planned provenance rules, candidate/analyst trust
+boundary, and import workflow are documented in
+[`docs/CASEWEAVE_INTEGRATION.md`](docs/CASEWEAVE_INTEGRATION.md).
 
 ## CLI Usage
 
 ```bash
-python3 -m uac_parser.cli /cases/uac-host01.tar.gz --out out/host01 \
+tracequarry /cases/uac-host01.tar.gz --out out/host01 \
   --incident-start 2026-06-16T08:00:00Z \
   --incident-end 2026-06-16T12:00:00Z \
   --year 2026 \
@@ -348,8 +446,10 @@ python3 -m uac_parser.cli /cases/uac-host01.tar.gz --out out/host01 \
 Multi-collection case workspace:
 
 ```bash
-python3 -m uac_parser.cli --case-out out/case-acme-linux \
+tracequarry --case-out out/case-acme-linux \
   --case-name "ACME Linux Intrusion" \
+  --case-reference IR-2026-0711 \
+  --case-workers 2 \
   --input /cases/uac-host01.tar.gz \
   --input /cases/uac-host02.tar.gz \
   --incident-start 2026-06-16T08:00:00Z \
@@ -364,8 +464,9 @@ python3 -m uac_parser.cli --case-out out/case-acme-linux \
 Case mode can also read a manifest:
 
 ```bash
-python3 -m uac_parser.cli --case-out out/case-acme-linux \
+tracequarry --case-out out/case-acme-linux \
   --input-manifest case-inputs.txt \
+  --case-workers 2 \
   --year 2026 \
   --timezone Asia/Hong_Kong
 ```
@@ -381,7 +482,7 @@ IoC files accept either one value per line or CSV rows in this shape:
 
 ```text
 value,kind,label
-198.51.100.50,ip,synthetic source
+198.51.100.50,ip,known scanner
 rclone,literal,exfiltration tooling
 anydesk,literal,remote access tooling
 /tmp/kworker,path,suspicious staging path
@@ -399,15 +500,17 @@ another responder run the parser without building a command line.
 python3 -m uac_parser.web --host 127.0.0.1 --port 8765 --work-dir web_runs
 ```
 
-The GUI defaults to an 8 GiB upload limit, a 40 GiB work-directory quota, two
-concurrent analysis slots, and a 120-second request timeout. Adjust these for a
-dedicated analysis workstation without removing the disk safety margin:
+The GUI defaults to an 8 GiB upload-session limit, a 40 GiB work-directory
+quota, two concurrent analysis slots, two collection workers per case, and a
+30-minute per-request timeout. Adjust these for a dedicated analysis workstation
+without removing the disk safety margin:
 
 ```bash
 python3 -m uac_parser.web --host 127.0.0.1 --port 8765 --work-dir web_runs \
   --input-root /cases \
   --max-upload-gib 8 --max-work-dir-gib 40 \
-  --max-concurrent-jobs 2 --request-timeout 120
+  --max-concurrent-jobs 1 --case-workers 2 --request-timeout 1800 \
+  --maintenance-interval 300 --state-retention-days 90
 ```
 
 Server-side paths are accepted only beneath an allowed evidence root. Repeat
@@ -415,35 +518,124 @@ Server-side paths are accepted only beneath an allowed evidence root. Repeat
 the directory from which the GUI was launched. Browser uploads remain isolated
 under the configured work directory.
 
+### Large Browser Cases
+
+For 50 to 150 or more browser-selected collections, drag the archives onto the
+evidence drop zone or use **Browse files**. Additional drops are added to the
+current selection and exact duplicates are skipped. TraceQuarry creates a staged
+upload session instead of sending every archive in one multipart request. Four
+files upload concurrently, each file is SHA-256 verified, and **Inspect Time
+Range** and **Start Analysis** reuse the same staged evidence. Interrupted or
+failed files can be retried without re-uploading files already marked **Staged**.
+
+The **Live Run** collection queue shows pending, uploading, staged, parsing,
+complete, and failed counts. Filter the table to find one collection and review
+its current parser stage. The queue also displays a path such as
+`uploads/staged-<session-id>`; resolve it beneath the configured `--work-dir` to
+inspect the local staged files. Stale unclaimed sessions expire after seven days,
+are rejected on access, and are removed by periodic maintenance.
+
+For a large case, run one analysis job at a time and begin with two case workers.
+Increase `--case-workers` only after observing available RAM, CPU, storage, and
+event volume. Collection count alone is not a capacity estimate: one archive
+with millions of records can cost more than many small archives.
+
 Open `http://127.0.0.1:8765`, then:
 
-1. Choose **Archive upload** for a browser-selected `.tar.gz`, `.tgz`, `.tar`, or
-   `.zip` UAC output. Select multiple archives to create a case workspace.
-2. Choose **Server path** for a file or extracted directory already present on
-   the analysis machine. Enter one path per line to create a case workspace.
+1. Choose **Archive upload**, then drop or browse for `.tar.gz`, `.tgz`, `.tar`,
+   or `.zip` UAC outputs, loose rotated logs, or SQLite databases. Select
+   multiple inputs to create a case workspace.
+2. Choose **Server path** for an archive, copied `/var/log` directory, loose log,
+   or SQLite database already present on the analysis machine. Enter one path per
+   line to create a case workspace.
 3. Set log year and timezone.
-4. Click **Inspect Time Range**.
-5. Set or refine the incident start and incident end.
-6. Add known IoCs.
-7. Run analysis and preserve the output directory path.
+4. Optionally enter a **Case reference** for the experimental CaseWeave export
+   preview.
+5. Click **Inspect Time Range**.
+6. Set or refine the incident start and incident end.
+7. Add known IoCs.
+8. Run analysis, review or tag events, and export the investigation workbook or
+   annotated timeline CSV.
+9. Use **Previous cases** to reopen completed outputs from the configured work
+   directory, including after restarting the local server.
 
 If both upload and server path are filled, the selected source mode controls
 which input is used.
 
-When more than one input is provided, the Live Run panel shows collection and
-correlation counts, opens the case summary preview, and links both case-level
-outputs and per-collection host summaries.
+When more than one input is provided, the Live Run panel shows upload and parser
+status for each collection, collection and correlation counts, opens the case
+summary preview, and links both case-level outputs and per-collection host
+summaries.
 
 The browser API uses a per-process request token and rejects non-loopback Host
-and Origin values. Restarting the server invalidates open GUI pages and makes
-prior output URLs unavailable; reload the page and run or reopen the relevant
-case from its filesystem output directory.
+and Origin values. Restarting the server invalidates open GUI pages and request
+tokens; reload the page. Completed outputs are reconstructed from manifests and
+remain available under **Previous cases** while they remain inside the same
+work directory. Case and job references are transactionally indexed in
+`web_runs/state/cases.sqlite3`; lifecycle transitions are validated and each
+record carries a monotonic revision for conflict detection. Timelines, findings,
+manifests, annotations, and
+other derived evidence remain under `web_runs/outputs/<job-id>/`. Legacy
+`state/jobs/*.json` records are imported automatically. Jobs interrupted by a
+restart are retained as interrupted operational records rather than silently
+disappearing, while completed output manifests can rebuild a missing index.
+
+Local operators can query `/api/health`, `/api/ready`, and `/api/jobs`. Use
+`--log-format json` for structured service logs. The supported hardened
+single-node deployment model, retention controls, scale guidance, and explicit
+shared-service limitations are documented in
+[`docs/ENTERPRISE_DEPLOYMENT.md`](docs/ENTERPRISE_DEPLOYMENT.md).
+
+## Direct Logs And SQLite
+
+TraceQuarry accepts a UAC archive, an extracted collection, a copied Linux log
+directory such as `host01/var/log`, or a single loose log. Plain text and gzip,
+bzip2, and xz rotations are decoded by content. When using the GUI, the copied
+evidence directory must be beneath a configured `--input-root`.
+
+```bash
+python3 -m uac_parser.cli /cases/host01/var/log --out out/host01-logs \
+  --year 2026 --timezone UTC
+```
+
+SQLite databases are recognized from the `SQLite format 3` file signature, so
+extensionless Synology files such as `.SYNOCONNDB` and `.SYNOSYSLOGDB` can be
+ingested. TraceQuarry opens the database read-only and immutable, inventories
+tables, normalizes rows with usable timestamp columns, and preserves each
+extracted record in the raw timeline field. Extraction is bounded to 256 tables,
+100,000 rows per table, 250,000 rows per database, 128 columns, and a 4 GiB
+database file.
+
+This is logical SQLite extraction, not deleted-record recovery. Uncheckpointed
+WAL content is not merged, rows without usable timestamps are counted but not
+expanded into timeline events, and unfamiliar schemas may require a dedicated
+adapter. Preserve the original database and its `-wal` and `-shm` sidecars for
+specialist examination.
+
+## Capacity Baseline
+
+The bounded synthetic capacity test on an 8-core Apple M3 system with 16 GB RAM
+completed a 100,000-event archive and a 500-collection, 50,000-event case
+workspace. For an interactive workflow on comparable hardware, start with a
+50,000-event ceiling and run unusually large jobs one at a time. Output volume,
+event mix, IoC count, and free disk can lower the practical limit.
+
+Native ESXi logs are not currently parsed. TraceQuarry can inventory and hash
+unmatched ESXi evidence, but `vmkernel.log`, `hostd.log`, `vpxa.log`,
+`vobd.log`, and `fdm.log` require dedicated adapters before they can contribute
+timeline events or findings. See the
+[capacity test report](docs/performance/LOAD_TEST_2026-07-21.md) for measured
+results, methodology, caveats, and reproduction instructions. The separate
+[high-volume browser UAT](docs/performance/HIGH_VOLUME_UPLOAD_UAT_2026-07-23.md)
+documents the staged 150-archive workflow and its narrower interpretation.
 
 ## Detection Coverage
 
 Current coverage is tuned for Linux intrusion triage:
 
 - Evidence handling: plain text plus gzip, bzip2, and xz compressed rotations;
+  direct copied log directories, loose log files, and bounded read-only SQLite
+  log extraction;
   native systemd journal and wtmp/btmp/lastlog databases remain inventoried as
   explicit unsupported sources instead of disappearing from coverage
 
@@ -475,17 +667,24 @@ Current coverage is tuned for Linux intrusion triage:
 Actor-relevant matches are tradecraft hints only. Do not report them as
 attribution without independent threat intelligence.
 
-Timeline schema `1.1` separates `evidence_role` (`behavior`,
+Timeline schema `1.2` separates `evidence_role` (`behavior`,
 `state_observation`, `context`, or `inference`), confirmed behavioral `mitre`
-mappings, and `mitre_candidates` that still require corroboration. Events also
-retain source SHA-256, parser version, timestamp precision/confidence, and
-observation intervals for integration with enterprise timeline platforms.
+mappings, and `mitre_candidates` that still require corroboration.
+`attack_phases` contains tactics derived from confirmed mappings when the
+technique has one tactic or the event context disambiguates a multi-tactic
+technique. `attack_phase_candidates` retains ambiguous and state-derived tactic
+possibilities. Events also retain source SHA-256, parser version, timestamp
+precision/confidence, and observation intervals for integration with enterprise
+timeline platforms.
 
 Tool, TTP, malware/payload metadata, and non-attributive actor-similarity
 profiles are consolidated in `rules/tagging_registry.yml`. Tool and TTP rules
 enrich events at runtime; actor profiles prioritize combinations of observed
 signals without claiming attribution. The registry hash is preserved in the run
 manifest so analysts can identify the exact detection content used for a case.
+Technique-to-tactic mappings are independently versioned in
+`rules/attack_phases.yml`, pinned to MITRE ATT&CK v19.1, validated with the same
+rules command, and fingerprinted in each run manifest.
 
 Community additions are welcome. See the [detection-pack contribution guide](rules/README.md)
 and validate changes before submitting them:
@@ -544,6 +743,42 @@ Avoid overclaiming:
 - Do not state that no activity occurred if the relevant source was absent.
 - Do not attribute to a named actor from TTP overlap alone.
 
+## Frequently Asked Questions
+
+### Does TraceQuarry require a UAC collection?
+
+No. UAC is the primary collection format, but TraceQuarry also accepts copied
+Linux log directories, individual recognizable logs, compressed rotations, and
+supported SQLite log databases.
+
+### Does TraceQuarry upload forensic evidence to the cloud?
+
+No. TraceQuarry is local-first and does not require external evidence upload.
+The web interface binds to loopback and is intended for a trusted analysis host.
+
+### Is TraceQuarry an EDR, SIEM, or replacement for forensic validation?
+
+No. It is a triage, timeline reconstruction, and evidence-review workbench.
+Findings and actor-profile similarities are investigative leads that must be
+validated against raw evidence and other incident data.
+
+### Can TraceQuarry combine multiple Linux collections?
+
+Yes. Case workspace mode preserves per-collection outputs and builds a merged
+timeline, case findings, IoC results, and conservative cross-host correlations.
+
+### Does TraceQuarry support MITRE ATT&CK tagging?
+
+Yes. It distinguishes context-supported ATT&CK mappings from candidate mappings
+that still require corroboration and includes tactic-phase fields in timeline
+and reporting outputs.
+
+### Is the CaseWeave integration available now?
+
+Not as a supported end-to-end feature. TraceQuarry currently emits a developer
+preview of the exchange bundle while the CaseWeave importer and collaborative
+workflow await their own public release.
+
 ## Install
 
 TraceQuarry supports Python 3.11 and 3.12. PyYAML is used to validate and load
@@ -551,16 +786,49 @@ the external detection registry.
 
 ```bash
 git clone https://github.com/Chill-Ethical-People/TraceQuarry.git
-cd tracequarry
+cd TraceQuarry
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install .
 ```
 
+### Ubuntu With `uv`
+
+The following commands install an isolated Python 3.12 runtime without writing
+packages into Ubuntu's system-managed Python environment:
+
+```bash
+sudo apt update
+sudo apt install -y git
+sudo snap install astral-uv --classic
+
+git clone https://github.com/Chill-Ethical-People/TraceQuarry.git
+cd TraceQuarry
+uv python install 3.12
+uv venv --python 3.12 .venv
+source .venv/bin/activate
+uv pip install .
+```
+
+Start the loopback-only GUI:
+
+```bash
+python -m uac_parser.web \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --work-dir web_runs \
+  --input-root "$PWD"
+```
+
+Open `http://127.0.0.1:8765`. To select copied evidence elsewhere, add its
+parent directory as another `--input-root`. Do not work around an
+`externally-managed-environment` message with `sudo pip`; confirm that
+`which python` points inside `TraceQuarry/.venv/bin` and use `uv pip install .`.
+
 You can also run it directly from the repository root with `PYTHONPATH`:
 
 ```bash
-cd tracequarry
+cd TraceQuarry
 PYTHONPATH=. python3 -m uac_parser.cli tests/fixtures/uac_sample --out /tmp/tracequarry-sample
 ```
 
@@ -587,6 +855,17 @@ real incident evidence, credentials, customer data, or third-party material that
 you are not allowed to share. See `CONTRIBUTING.md` and `SECURITY.md` before
 opening public issues or pull requests.
 
+## Community Acknowledgments
+
+This public beta was strengthened by practical responder feedback and hands-on
+testing. Thank you to
+[James Navarro](https://www.linkedin.com/in/james-navarro-161955196/),
+[Jacob W](https://www.linkedin.com/in/jacob-w-491ab28/), and
+[Kaylin Malutich](https://www.linkedin.com/in/kaylin-malutich-0210a449/) for
+testing real workflows, reporting friction, and helping shape the large-case
+upload experience, timeline review, direct-log intake, export options, and case
+reopening improvements.
+
 ## Validation And Analyst Confidence
 
 TraceQuarry is validated with bundled fixture evidence and generated synthetic
@@ -599,6 +878,8 @@ scenarios. The automated suite covers:
 - Output traversal, Host, Origin, and CSRF security regressions
 - Public job-data redaction and restrictive evidence-file permissions
 - Oversized HTTP request rejection and parser error reporting
+- Concurrent upload reservation, enforced expiry, durable job-state recovery,
+  health/readiness telemetry, and packaged web-resource validation
 
 CI also runs Snyk Open Source against the pinned production dependency baseline
 in `requirements.txt`. A scheduled weekly monitor checks that same baseline for
@@ -616,7 +897,7 @@ parser errors or missing sources as limitations in the investigation report.
 Run the fixture smoke test before using a changed parser build on case evidence:
 
 ```bash
-cd tracequarry
+cd TraceQuarry
 PYTHONPATH=. python3 -m uac_parser.cli tests/fixtures/uac_sample \
   --out /tmp/tracequarry-smoke \
   --incident-start 2026-06-16T09:58:00+08:00 \
@@ -638,7 +919,7 @@ ls /tmp/tracequarry-smoke/timeline_full.csv \
 Run the automated correctness, archive-safety, correlation, and pipeline tests:
 
 ```bash
-cd tracequarry
+cd TraceQuarry
 PYTHONPATH=. python3 -m unittest discover -s tests -v
 ```
 

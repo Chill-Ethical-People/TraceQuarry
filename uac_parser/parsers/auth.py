@@ -72,183 +72,224 @@ def parse(
             pid=pid,
             raw=raw,
         )
-        if "Accepted " in msg and " from " in msg:
-            sm = SSH_SUCCESS_RE.search(msg)
-            if sm:
-                event.event_category = "authentication"
-                event.event_action = "ssh_login_success"
-                event.user = sm.group("user")
-                event.src_ip = sm.group("src_ip")
-                event.port = sm.group("port")
-                event.mitre = ["T1078", "T1021.004"]
-                event.severity = "medium"
-                event.confidence = "high"
-                event.tags = ["ssh", "remote_access", "valid_account"]
-                event.summary = (
-                    f"Successful SSH login for {event.user} from {event.src_ip}"
-                )
-                events.append(event)
-                continue
-        if "Failed " in msg and " from " in msg:
-            fm = SSH_FAIL_RE.search(msg)
-            if fm:
-                event.event_category = "authentication"
-                event.event_action = "ssh_login_failure"
-                event.user = fm.group("user")
-                event.src_ip = fm.group("src_ip")
-                event.port = fm.group("port")
-                event.mitre = ["T1110"]
-                event.severity = "low"
-                event.confidence = "high"
-                event.tags = ["ssh", "bruteforce", "authentication_failure"]
-                event.summary = f"Failed SSH login for {event.user} from {event.src_ip}"
-                events.append(event)
-                continue
-        if proc and "sudo" in proc:
-            sudo = SUDO_RE.search(msg)
-            if sudo:
-                event.event_category = "privilege"
-                event.event_action = "sudo_command"
-                event.user = sudo.group("user")
-                event.command = sudo.group("command").strip()
-                event.mitre = ["T1548.003"]
-                event.severity = "medium"
-                event.confidence = "high"
-                event.tags = ["sudo", "privilege_escalation", "command"]
-                event.summary = f"{event.user} ran sudo command: {event.command}"
-                event.extra = {
-                    "pwd": sudo.group("pwd").strip(),
-                    "runas": sudo.group("runas").strip(),
-                }
-                events.append(event)
-                continue
-        if proc and "su" in proc and "session opened" in msg:
-            su = SU_RE.search(msg)
-            event.event_category = "privilege"
-            event.event_action = "su_session_opened"
-            event.user = su.group("user") if su else None
-            event.mitre = ["T1078"]
-            event.severity = "low"
-            event.confidence = "medium"
-            event.tags = ["su", "session"]
-            event.summary = f"su session opened for {event.user or 'unknown user'}"
+        if _classify_event(event, msg, proc):
             events.append(event)
-            continue
-        if "password changed for" in msg:
-            pm = PASSWD_CHANGE_RE.search(msg)
-            if pm:
-                event.event_category = "credential_change"
-                event.event_action = "password_changed"
-                event.user = pm.group("user")
-                event.mitre = ["T1098"]
-                event.severity = "high" if pm.group("user") == "root" else "medium"
-                event.confidence = "high"
-                event.tags = ["password_change", "credential"]
-                event.detection_names = ["auth_password_changed"]
-                event.ttp_flags = ["auth_password_changed"]
-                if pm.group("user") == "root":
-                    event.detection_names.append("root_password_changed")
-                    event.ttp_flags.append("root_password_changed")
-                event.summary = f"Password changed for {event.user}"
-                events.append(event)
-                continue
-        if "new user:" in msg:
-            um = USERADD_RE.search(msg)
-            if um:
-                event.event_category = "persistence"
-                event.event_action = "user_created"
-                event.user = um.group("user")
-                event.uid = um.group("uid")
-                event.gid = um.group("gid")
-                event.mitre = ["T1136.001"]
-                event.severity = "high"
-                event.confidence = "high"
-                event.tags = ["account_management", "user_created"]
-                event.detection_names = ["auth_user_created"]
-                event.ttp_flags = ["auth_user_created"]
-                event.summary = f"New user created: {event.user} uid={event.uid or '?'}"
-                event.extra = {"home": um.group("home"), "shell": um.group("shell")}
-                events.append(event)
-                continue
-        if "new group:" in msg:
-            gm = GROUPADD_RE.search(msg)
-            if gm:
-                event.event_category = "persistence"
-                event.event_action = "group_created"
-                event.gid = gm.group("gid")
-                event.mitre = ["T1136.001"]
-                event.severity = "medium"
-                event.confidence = "high"
-                event.tags = ["account_management", "group_created"]
-                event.detection_names = ["auth_group_created"]
-                event.ttp_flags = ["auth_group_created"]
-                event.summary = (
-                    f"New group created: {gm.group('group')} gid={event.gid or '?'}"
-                )
-                event.extra = {"group": gm.group("group")}
-                events.append(event)
-                continue
-        if "delete user" in msg:
-            dm = USERDEL_RE.search(msg)
-            if dm:
-                event.event_category = "persistence"
-                event.event_action = "user_deleted"
-                event.user = dm.group("user")
-                event.mitre = ["T1531"]
-                event.severity = "high"
-                event.confidence = "high"
-                event.tags = ["account_management", "user_deleted"]
-                event.detection_names = ["auth_user_deleted"]
-                event.ttp_flags = ["auth_user_deleted"]
-                event.summary = f"User deleted: {event.user}"
-                events.append(event)
-                continue
-        if "change user" in msg:
-            cm = USERMOD_RE.search(msg)
-            if cm:
-                event.event_category = "persistence"
-                event.event_action = "user_modified"
-                event.user = cm.group("user")
-                event.mitre = ["T1098"]
-                event.severity = "medium"
-                event.confidence = "high"
-                event.tags = ["account_management", "user_modified"]
-                event.detection_names = ["auth_user_modified"]
-                event.ttp_flags = ["auth_user_modified"]
-                event.summary = f"User modified: {event.user}"
-                events.append(event)
-                continue
-        if "account locked" in msg or "account unlocked" in msg:
-            lm = ACCT_LOCK_RE.search(msg)
-            if lm:
-                action = lm.group("action")
-                event.event_category = "credential_change"
-                event.event_action = f"account_{action}"
-                event.user = lm.group("user")
-                event.mitre = ["T1098"] if action == "unlocked" else ["T1531"]
-                event.severity = "medium"
-                event.confidence = "high"
-                event.tags = ["account_management", f"account_{action}"]
-                event.detection_names = [f"auth_account_{action}"]
-                event.ttp_flags = [f"auth_account_{action}"]
-                event.summary = f"Account {action}: {event.user}"
-                events.append(event)
-                continue
-        if "Invalid user" in msg:
-            iu = INVALID_USER_RE.search(msg)
-            if iu:
-                event.event_category = "authentication"
-                event.event_action = "ssh_invalid_user"
-                event.user = iu.group("user")
-                event.src_ip = iu.group("src_ip")
-                event.port = iu.group("port")
-                event.mitre = ["T1110"]
-                event.severity = "low"
-                event.confidence = "high"
-                event.tags = ["ssh", "bruteforce", "invalid_user"]
-                event.detection_names = ["ssh_invalid_user_attempt"]
-                event.ttp_flags = ["ssh_invalid_user_attempt"]
-                event.summary = f"Invalid user {event.user} from {event.src_ip}"
-                events.append(event)
-                continue
     return events
+
+
+def _classify_event(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    handlers = (
+        _ssh_success,
+        _ssh_failure,
+        _sudo_command,
+        _su_session,
+        _password_change,
+        _user_created,
+        _group_created,
+        _user_deleted,
+        _user_modified,
+        _account_lock_change,
+        _invalid_user,
+    )
+    return any(handler(event, msg, proc) for handler in handlers)
+
+
+def _ssh_success(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = (
+        SSH_SUCCESS_RE.search(msg) if "Accepted " in msg and " from " in msg else None
+    )
+    if not match:
+        return False
+    event.event_category = "authentication"
+    event.event_action = "ssh_login_success"
+    event.user = match.group("user")
+    event.src_ip = match.group("src_ip")
+    event.port = match.group("port")
+    event.mitre = ["T1078", "T1021.004"]
+    event.severity = "medium"
+    event.confidence = "high"
+    event.tags = ["ssh", "remote_access", "valid_account"]
+    event.summary = f"Successful SSH login for {event.user} from {event.src_ip}"
+    return True
+
+
+def _ssh_failure(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = SSH_FAIL_RE.search(msg) if "Failed " in msg and " from " in msg else None
+    if not match:
+        return False
+    event.event_category = "authentication"
+    event.event_action = "ssh_login_failure"
+    event.user = match.group("user")
+    event.src_ip = match.group("src_ip")
+    event.port = match.group("port")
+    event.mitre = ["T1110"]
+    event.severity = "low"
+    event.confidence = "high"
+    event.tags = ["ssh", "bruteforce", "authentication_failure"]
+    event.summary = f"Failed SSH login for {event.user} from {event.src_ip}"
+    return True
+
+
+def _sudo_command(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = SUDO_RE.search(msg) if proc and "sudo" in proc else None
+    if not match:
+        return False
+    event.event_category = "privilege"
+    event.event_action = "sudo_command"
+    event.user = match.group("user")
+    event.command = match.group("command").strip()
+    event.mitre = ["T1548.003"]
+    event.severity = "medium"
+    event.confidence = "high"
+    event.tags = ["sudo", "privilege_escalation", "command"]
+    event.summary = f"{event.user} ran sudo command: {event.command}"
+    event.extra = {
+        "pwd": match.group("pwd").strip(),
+        "runas": match.group("runas").strip(),
+    }
+    return True
+
+
+def _su_session(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    if not proc or "su" not in proc or "session opened" not in msg:
+        return False
+    match = SU_RE.search(msg)
+    event.event_category = "privilege"
+    event.event_action = "su_session_opened"
+    event.user = match.group("user") if match else None
+    event.mitre = ["T1078"]
+    event.severity = "low"
+    event.confidence = "medium"
+    event.tags = ["su", "session"]
+    event.summary = f"su session opened for {event.user or 'unknown user'}"
+    return True
+
+
+def _password_change(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = PASSWD_CHANGE_RE.search(msg) if "password changed for" in msg else None
+    if not match:
+        return False
+    event.event_category = "credential_change"
+    event.event_action = "password_changed"
+    event.user = match.group("user")
+    event.mitre = ["T1098"]
+    event.severity = "high" if event.user == "root" else "medium"
+    event.confidence = "high"
+    event.tags = ["password_change", "credential"]
+    event.detection_names = ["auth_password_changed"]
+    event.ttp_flags = ["auth_password_changed"]
+    if event.user == "root":
+        event.detection_names.append("root_password_changed")
+        event.ttp_flags.append("root_password_changed")
+    event.summary = f"Password changed for {event.user}"
+    return True
+
+
+def _user_created(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = USERADD_RE.search(msg) if "new user:" in msg else None
+    if not match:
+        return False
+    event.event_category = "persistence"
+    event.event_action = "user_created"
+    event.user = match.group("user")
+    event.uid = match.group("uid")
+    event.gid = match.group("gid")
+    event.mitre = ["T1136.001"]
+    event.severity = "high"
+    event.confidence = "high"
+    event.tags = ["account_management", "user_created"]
+    event.detection_names = ["auth_user_created"]
+    event.ttp_flags = ["auth_user_created"]
+    event.summary = f"New user created: {event.user} uid={event.uid or '?'}"
+    event.extra = {"home": match.group("home"), "shell": match.group("shell")}
+    return True
+
+
+def _group_created(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = GROUPADD_RE.search(msg) if "new group:" in msg else None
+    if not match:
+        return False
+    event.event_category = "persistence"
+    event.event_action = "group_created"
+    event.gid = match.group("gid")
+    event.mitre = ["T1136.001"]
+    event.severity = "medium"
+    event.confidence = "high"
+    event.tags = ["account_management", "group_created"]
+    event.detection_names = ["auth_group_created"]
+    event.ttp_flags = ["auth_group_created"]
+    event.summary = f"New group created: {match.group('group')} gid={event.gid or '?'}"
+    event.extra = {"group": match.group("group")}
+    return True
+
+
+def _user_deleted(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = USERDEL_RE.search(msg) if "delete user" in msg else None
+    if not match:
+        return False
+    event.event_category = "persistence"
+    event.event_action = "user_deleted"
+    event.user = match.group("user")
+    event.mitre = ["T1531"]
+    event.severity = "high"
+    event.confidence = "high"
+    event.tags = ["account_management", "user_deleted"]
+    event.detection_names = ["auth_user_deleted"]
+    event.ttp_flags = ["auth_user_deleted"]
+    event.summary = f"User deleted: {event.user}"
+    return True
+
+
+def _user_modified(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = USERMOD_RE.search(msg) if "change user" in msg else None
+    if not match:
+        return False
+    event.event_category = "persistence"
+    event.event_action = "user_modified"
+    event.user = match.group("user")
+    event.mitre = ["T1098"]
+    event.severity = "medium"
+    event.confidence = "high"
+    event.tags = ["account_management", "user_modified"]
+    event.detection_names = ["auth_user_modified"]
+    event.ttp_flags = ["auth_user_modified"]
+    event.summary = f"User modified: {event.user}"
+    return True
+
+
+def _account_lock_change(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    relevant = "account locked" in msg or "account unlocked" in msg
+    match = ACCT_LOCK_RE.search(msg) if relevant else None
+    if not match:
+        return False
+    action = match.group("action")
+    event.event_category = "credential_change"
+    event.event_action = f"account_{action}"
+    event.user = match.group("user")
+    event.mitre = ["T1098"] if action == "unlocked" else ["T1531"]
+    event.severity = "medium"
+    event.confidence = "high"
+    event.tags = ["account_management", f"account_{action}"]
+    event.detection_names = [f"auth_account_{action}"]
+    event.ttp_flags = [f"auth_account_{action}"]
+    event.summary = f"Account {action}: {event.user}"
+    return True
+
+
+def _invalid_user(event: TimelineEvent, msg: str, proc: str | None) -> bool:
+    match = INVALID_USER_RE.search(msg) if "Invalid user" in msg else None
+    if not match:
+        return False
+    event.event_category = "authentication"
+    event.event_action = "ssh_invalid_user"
+    event.user = match.group("user")
+    event.src_ip = match.group("src_ip")
+    event.port = match.group("port")
+    event.mitre = ["T1110"]
+    event.severity = "low"
+    event.confidence = "high"
+    event.tags = ["ssh", "bruteforce", "invalid_user"]
+    event.detection_names = ["ssh_invalid_user_attempt"]
+    event.ttp_flags = ["ssh_invalid_user_attempt"]
+    event.summary = f"Invalid user {event.user} from {event.src_ip}"
+    return True

@@ -1,6 +1,6 @@
 ---
 name: tracequarry
-description: Analyze one or more Unix-like Artifacts Collector (UAC) archives or extracted Linux evidence directories with TraceQuarry. Use when Codex needs to run or guide Linux DFIR triage, determine an incident window, normalize UTC timelines, match IoCs, prioritize ransomware, exploitation, credential, persistence, mining, or advanced-intrusion hypotheses, correlate activity across collections, validate findings against raw evidence, or prepare a defensible responder summary. Do not use it as proof of malware identity, lateral movement, or threat-actor attribution.
+description: Analyze one or more Unix-like Artifacts Collector (UAC) archives, copied Linux log trees, loose logs, or supported SQLite log databases with TraceQuarry. Use when Codex needs to run or guide Linux DFIR triage, determine an incident window, normalize UTC timelines, match IoCs, prioritize ransomware, exploitation, credential, persistence, mining, or advanced-intrusion hypotheses, correlate activity across collections, validate findings against raw evidence, or prepare a defensible responder summary. Do not use it as proof of malware identity, lateral movement, or threat-actor attribution.
 ---
 
 # TraceQuarry Linux DFIR
@@ -27,7 +27,8 @@ the conclusion.
 
 ## Establish Scope
 
-1. Confirm whether the input is a single UAC collection or a multi-host case.
+1. Confirm whether the input is a UAC collection, a copied Linux log source, a
+   supported SQLite log database, or a multi-host case.
 2. Confirm the suspected incident start and end, including timezone. Ask for the
    period when it materially changes the requested analysis and cannot be inferred.
 3. Confirm the year for syslog-style timestamps that omit a year.
@@ -69,6 +70,19 @@ tracequarry /cases/uac-host01.tar.gz --out /cases/derived/host01 \
 Omit incident boundaries only for an intentional full-range parse. Use `--host`
 only when collection metadata cannot identify the host; document the override.
 
+Copied Linux log directories and loose logs use the same entrypoint:
+
+```bash
+tracequarry /cases/host01/var/log --out /cases/derived/host01-logs \
+  --year 2026 --timezone UTC --threat-type comprehensive
+```
+
+TraceQuarry recognizes SQLite databases by file signature, including extensionless
+Synology-style log databases. Treat this as bounded logical row extraction. It is
+not deleted-record recovery, does not merge uncheckpointed WAL content, and does
+not replace native database forensics. Preserve the database together with any
+matching `-wal` and `-shm` files before analysis.
+
 ## Run A Multi-Collection Case
 
 ```bash
@@ -96,11 +110,20 @@ tracequarry-web --host 127.0.0.1 --port 8765 \
   --input-root /cases
 ```
 
-Use the GUI to inspect temporal coverage, supply multiple archives or server-side
-paths, set incident parameters, follow per-collection progress, preview summaries,
-and review raw timeline evidence. Do not expose the development server directly
-to a LAN or the Internet. Approve only case-scoped evidence directories through
-`--input-root`; do not allow the filesystem root or a user's entire home directory.
+Use the GUI to inspect temporal coverage, supply multiple archives, loose logs,
+SQLite databases, or server-side paths, set incident parameters, follow
+per-collection progress, preview summaries, and review raw timeline evidence.
+Analyst dispositions, guided investigation tags, notes, and explicit reconstructed
+summary selections are written to
+`analyst_annotations.json`, separate from normalized evidence. Use the timeline
+CSV export when a review-ready file needs both event and annotation fields. The
+`summary_selection` export field contains `Summary` only when an analyst promoted
+the event. Use **Incident Briefing** to review that sparse chronology with raw
+evidence and provenance before reporting it. The
+**Previous cases** control can reopen completed outputs after a service restart.
+Do not expose the development server directly to a LAN or the Internet. Approve
+only case-scoped evidence directories through `--input-root`; do not allow the
+filesystem root or a user's entire home directory.
 
 ## Review Outputs In Order
 
@@ -118,6 +141,8 @@ to a LAN or the Internet. Approve only case-scoped evidence directories through
 7. Expand into the full timeline at window edges, around precursor events, and
    wherever sequence or state cannot be established from the mini timeline.
 8. Review IoC hits by first seen, last seen, host, user, action, and source path.
+9. For SQLite inputs, record skipped tables, row limits, tables without usable
+   timestamps, and the absence of WAL/deleted-record recovery as limitations.
 
 Read [references/evidence-and-output-guide.md](references/evidence-and-output-guide.md)
 when interpreting schema fields, coverage, provenance, or case outputs.
@@ -133,7 +158,9 @@ when interpreting schema fields, coverage, provenance, or case outputs.
    - `context`: supporting configuration or history.
    - `inference`: parser-derived placement or relationship requiring corroboration.
 4. Treat `mitre` as a behavior-supported mapping and `mitre_candidates` as review
-   hypotheses. Neither field establishes intent or actor identity.
+   hypotheses. Treat `attack_phases` as derived from confirmed technique mappings
+   and `attack_phase_candidates` as uncorroborated phase context. None of these
+   fields establishes intent or actor identity.
 5. Check timestamp precision, confidence, raw value, and observation interval.
    Do not impose second-level ordering on date-only or inferred timestamps.
 6. Distinguish execution from string presence. Defensive `grep`, `rg`, YARA, AV,
@@ -151,7 +178,8 @@ Report in this order:
 3. Evidence coverage, unsupported sources, parser errors, and material limitations.
 4. Findings ordered by impact and confidence, each with UTC time, host, event IDs,
    source path, short raw excerpt, corroboration, and alternative explanation.
-5. A concise incident timeline separating observed behavior from state and inference.
+5. A concise incident timeline built from deliberately selected, raw-validated
+   events and separating observed behavior from state and inference.
 6. IoCs, suspicious tooling, ATT&CK mappings, and actor-profile similarities with
    explicit caveats.
 7. Unanswered questions, preservation needs, and recommended next pivots.

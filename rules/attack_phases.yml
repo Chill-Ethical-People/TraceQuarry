@@ -1,0 +1,140 @@
+metadata:
+  schema_version: "1.0"
+  attack_version: "19.1"
+  attack_release_date: "2026-05-12"
+  source: "https://github.com/mitre-attack/attack-stix-data"
+  note: >-
+    Technique-to-tactic mappings are pinned to MITRE ATT&CK v19.1. Revoked or
+    superseded technique IDs remain only where TraceQuarry rules still emit
+    them, so historical detection content stays explainable.
+
+phases:
+  reconnaissance: {id: TA0043, label: Reconnaissance, order: 10}
+  resource_development: {id: TA0042, label: Resource Development, order: 20}
+  initial_access: {id: TA0001, label: Initial Access, order: 30}
+  execution: {id: TA0002, label: Execution, order: 40}
+  persistence: {id: TA0003, label: Persistence, order: 50}
+  privilege_escalation: {id: TA0004, label: Privilege Escalation, order: 60}
+  stealth: {id: TA0005, label: Stealth, order: 70}
+  defense_impairment: {id: TA0112, label: Defense Impairment, order: 80}
+  credential_access: {id: TA0006, label: Credential Access, order: 90}
+  discovery: {id: TA0007, label: Discovery, order: 100}
+  lateral_movement: {id: TA0008, label: Lateral Movement, order: 110}
+  collection: {id: TA0009, label: Collection, order: 120}
+  command_and_control: {id: TA0011, label: Command and Control, order: 130}
+  exfiltration: {id: TA0010, label: Exfiltration, order: 140}
+  impact: {id: TA0040, label: Impact, order: 150}
+
+phase_signals:
+  reconnaissance: [reconnaissance, discovery_reconnaissance]
+  resource_development: [resource_development]
+  initial_access: [initial_access]
+  execution: [execution]
+  persistence: [persistence]
+  privilege_escalation: [privilege_escalation, privilege]
+  stealth: [stealth, defense_evasion]
+  defense_impairment: [defense_impairment, defense_evasion]
+  credential_access: [credential_access, credential_harvesting]
+  discovery: [discovery, discovery_reconnaissance]
+  lateral_movement: [lateral_movement]
+  collection: [collection]
+  command_and_control: [command_and_control, c2]
+  exfiltration: [exfiltration]
+  impact: [impact, ransomware_impact]
+
+techniques:
+  T0831: [impact]
+  T0882: [impact]
+  T1003.008: [credential_access]
+  T1005: [collection]
+  T1014: [stealth]
+  T1021: [lateral_movement]
+  T1021.004: [lateral_movement]
+  T1030: [exfiltration]
+  T1036.005: [stealth]
+  T1037: [persistence, privilege_escalation]
+  T1037.004: [persistence, privilege_escalation]
+  T1046: [discovery]
+  T1048: [exfiltration]
+  T1048.002: [exfiltration]
+  T1048.003: [exfiltration]
+  T1053: [execution, persistence, privilege_escalation]
+  T1053.003: [execution, persistence, privilege_escalation]
+  T1053.007: [execution, persistence, privilege_escalation]
+  T1056: [collection, credential_access]
+  T1059: [execution]
+  T1059.004: [execution]
+  T1059.009: [execution]
+  T1059.013: [execution]
+  T1069: [discovery]
+  T1070: [stealth]
+  T1070.003: [stealth]
+  T1070.004: [stealth]
+  T1070.006: [stealth]
+  T1071.001: [command_and_control]
+  T1071.004: [command_and_control]
+  T1074.001: [collection]
+  T1078: [stealth, persistence, privilege_escalation, initial_access]
+  T1082: [discovery]
+  T1083: [discovery]
+  T1090: [command_and_control]
+  T1095: [command_and_control]
+  T1098: [persistence, privilege_escalation]
+  T1098.004: [persistence, privilege_escalation]
+  T1102: [command_and_control]
+  T1102.002: [command_and_control]
+  T1105: [command_and_control]
+  T1110: [credential_access]
+  T1110.001: [credential_access]
+  T1110.003: [credential_access]
+  T1133: [persistence, initial_access]
+  T1136.001: [persistence]
+  T1190: [initial_access]
+  T1195.002: [initial_access]
+  T1205: [stealth, persistence, command_and_control]
+  T1219: [command_and_control]
+  T1219.002: [command_and_control]
+  T1222.002: [defense_impairment]
+  T1485: [impact]
+  T1486: [impact]
+  T1489: [impact]
+  T1490: [impact]
+  T1496: [impact]
+  T1498: [impact]
+  T1505: [persistence]
+  T1505.003: [persistence]
+  T1531: [impact]
+  T1543: [persistence, privilege_escalation]
+  T1543.002: [persistence, privilege_escalation]
+  T1546: [privilege_escalation, persistence]
+  T1546.004: [privilege_escalation, persistence]
+  T1547: [persistence, privilege_escalation]
+  T1547.006: [persistence, privilege_escalation]
+  T1548: [privilege_escalation]
+  T1548.001: [privilege_escalation]
+  T1548.003: [privilege_escalation]
+  T1552: [credential_access]
+  T1552.001: [credential_access]
+  T1552.004: [credential_access]
+  T1552.005: [credential_access]
+  T1554: [persistence]
+  T1556: [defense_impairment, persistence, credential_access]
+  T1556.003: [defense_impairment, persistence, credential_access]
+  T1560.001: [collection]
+  T1561: [impact]
+  T1562.001: [stealth]
+  T1567: [exfiltration]
+  T1567.002: [exfiltration]
+  T1569.003: [execution]
+  T1571: [command_and_control]
+  T1572: [command_and_control]
+  T1574: [stealth, execution]
+  T1574.006: [stealth, execution]
+  T1595.001: [reconnaissance]
+  T1595.002: [reconnaissance]
+  T1609: [execution]
+  T1610: [execution]
+  T1611: [privilege_escalation]
+  T1613: [discovery]
+  T1685: [defense_impairment]
+  T1686: [defense_impairment]

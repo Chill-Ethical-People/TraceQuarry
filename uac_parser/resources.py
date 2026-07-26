@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def resource_directories(kind: str) -> tuple[Path, ...]:
-    if kind not in {"assets", "rules"}:
+    if kind not in {"assets", "rules", "web"}:
         raise ValueError(f"Unsupported TraceQuarry resource kind: {kind}")
     return (
         Path(__file__).resolve().parents[1] / kind,

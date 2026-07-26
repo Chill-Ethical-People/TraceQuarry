@@ -58,7 +58,8 @@ publishing the beta release announcement.
 
 1. Confirm `pyproject.toml` and `uac_parser/__init__.py` contain the intended
    version.
-2. Create and push an annotated `v0.4.0-beta.1` tag.
+2. Create and push an annotated tag matching the version being released, for
+   example `v0.4.0-beta.2`.
 3. Confirm the Release workflow publishes the wheel, source distribution,
    CycloneDX SBOM, and `SHA256SUMS`.
 4. Verify the published checksums from a fresh download.

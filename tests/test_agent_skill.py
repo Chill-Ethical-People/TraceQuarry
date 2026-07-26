@@ -57,10 +57,11 @@ class AgentSkillContractTests(unittest.TestCase):
             "--threat-type",
             "case_manifest.json",
             "mitre_candidates",
+            "attack_phases",
             "evidence_role",
         ):
             self.assertIn(term, content)
-        self.assertIn('schema_version: str = "1.1"', event_model)
+        self.assertIn('schema_version: str = "1.2"', event_model)
 
     def test_uploadable_skill_package_is_complete(self) -> None:
         source_files = {

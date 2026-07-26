@@ -15,8 +15,13 @@ permissions:
 jobs:
   open-source:
     name: Open Source dependencies
-    # GitHub does not provide repository secrets to pull requests from forks.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Actions secrets are unavailable to forks and Dependabot. Dependency Review
+    # remains the credential-free gate for those pull requests; main, schedules,
+    # manual runs, and trusted contributor branches still receive a Snyk scan.
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

@@ -132,3 +132,52 @@ class FindingTests(unittest.TestCase):
             if item["title"] == "Suid File Observed"
         )
         self.assertEqual(finding["severity"], "medium")
+
+    def test_policy_event_is_indexed_once_but_preserves_detection_count(self) -> None:
+        event = TimelineEvent(
+            event_id="evt-destructive",
+            event_action="destructive_command",
+            detection_names=["destructive_command"],
+            evidence_role="behavior",
+        )
+
+        finding = next(
+            item
+            for item in derive_findings([event])
+            if item["title"] == "Destructive Command"
+        )
+
+        self.assertEqual(finding["event_ids"], ["evt-destructive"])
+        self.assertIn("Observed 2 event(s)", finding["summary"])
+
+    def test_account_lifecycle_counts_unique_accounts_not_evidence_rows(self) -> None:
+        events = [
+            TimelineEvent(
+                event_id="evt-account-diff",
+                source_type="account_diff",
+                event_action="account_created_since_backup",
+                user="svc-backup",
+            ),
+            TimelineEvent(
+                event_id="evt-useradd",
+                source_type="auth_log",
+                event_action="user_created",
+                user="svc-backup",
+            ),
+            TimelineEvent(
+                event_id="evt-shadow-diff",
+                source_type="account_diff",
+                event_action="password_set_new_account",
+                user="svc-backup",
+            ),
+        ]
+
+        finding = next(
+            item
+            for item in derive_findings(events)
+            if item["title"] == "Account Lifecycle Changes Detected"
+        )
+
+        self.assertIn("1 unique account(s) observed as created", finding["summary"])
+        self.assertIn("across 3 supporting event(s)", finding["summary"])
+        self.assertNotIn("3 account(s) created", finding["summary"])

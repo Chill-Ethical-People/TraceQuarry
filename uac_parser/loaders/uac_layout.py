@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import os
+import stat
 from dataclasses import dataclass, field
+from hashlib import sha256
 from pathlib import Path
+from typing import Any
+
+SQLITE_MAGIC = b"SQLite format 3\x00"
 
 
 @dataclass
@@ -107,7 +113,7 @@ def discover_sources(root: Path) -> list[SourceFile]:
                 rel = path.relative_to(root).as_posix()
                 if _ignored_artifact(rel):
                     continue
-                if path.is_file():
+                if path.is_file() and not path.is_symlink():
                     if not _valid_source(source_type, rel):
                         continue
                     sources.append(
@@ -118,6 +124,20 @@ def discover_sources(root: Path) -> list[SourceFile]:
                             size=path.stat().st_size,
                         )
                     )
+    for path in root.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if _ignored_artifact(rel) or not _is_sqlite_database(path):
+            continue
+        sources.append(
+            SourceFile(
+                path=path,
+                relative=rel,
+                source_type="sqlite_log",
+                size=path.stat().st_size,
+            )
+        )
     seen: set[str] = set()
     unique: list[SourceFile] = []
     for source in sources:
@@ -129,6 +149,14 @@ def discover_sources(root: Path) -> list[SourceFile]:
     return unique
 
 
+def _is_sqlite_database(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(len(SQLITE_MAGIC)) == SQLITE_MAGIC
+    except OSError:
+        return False
+
+
 def discover_evidence_files(
     root: Path, sources: list[SourceFile]
 ) -> list[EvidenceFile]:
@@ -138,11 +166,9 @@ def discover_evidence_files(
         source_types.setdefault(source.relative, set()).add(source.source_type)
     evidence = []
     for path in root.rglob("*"):
-        if not path.is_file():
+        if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(root).as_posix()
-        if _ignored_artifact(relative):
-            continue
         matched = sorted(source_types.get(relative, set()))
         evidence.append(
             EvidenceFile(
@@ -161,9 +187,57 @@ def discover_evidence_files(
     return sorted(evidence, key=lambda item: item.relative)
 
 
-def discover_exclusions(root: Path) -> list[dict[str, str]]:
+def discover_exclusions(root: Path) -> list[dict[str, Any]]:
     exclusions = []
     for path in root.rglob("*"):
+        if path.is_symlink():
+            target = str(path.readlink())
+            exclusions.append(
+                {
+                    "relative": path.relative_to(root).as_posix(),
+                    "reason": "symlink_not_followed",
+                    "member_type": "symlink",
+                    "byte_size": len(target.encode("utf-8", "surrogateescape")),
+                    "sha256": sha256(
+                        target.encode("utf-8", "surrogateescape")
+                    ).hexdigest(),
+                    "link_target": target,
+                }
+            )
+            continue
+        try:
+            file_stat = path.lstat()
+        except OSError:
+            continue
+        special_type = _special_member_type(file_stat.st_mode)
+        if special_type:
+            device_major = (
+                os.major(file_stat.st_rdev)
+                if stat.S_ISCHR(file_stat.st_mode) or stat.S_ISBLK(file_stat.st_mode)
+                else 0
+            )
+            device_minor = (
+                os.minor(file_stat.st_rdev)
+                if stat.S_ISCHR(file_stat.st_mode) or stat.S_ISBLK(file_stat.st_mode)
+                else 0
+            )
+            canonical = (
+                f"{special_type.encode('ascii')!r}:{device_major}:{device_minor}"
+            ).encode()
+            exclusions.append(
+                {
+                    "relative": path.relative_to(root).as_posix(),
+                    "reason": "special_member_not_materialized",
+                    "member_type": "special",
+                    "type_flag": special_type,
+                    "device_major": str(device_major),
+                    "device_minor": str(device_minor),
+                    "byte_size": len(canonical),
+                    "sha256": sha256(canonical).hexdigest(),
+                    "link_target": "",
+                }
+            )
+            continue
         if not path.is_file():
             continue
         relative = path.relative_to(root).as_posix()
@@ -171,6 +245,18 @@ def discover_exclusions(root: Path) -> list[dict[str, str]]:
         if reason:
             exclusions.append({"relative": relative, "reason": reason})
     return sorted(exclusions, key=lambda item: item["relative"])
+
+
+def _special_member_type(mode: int) -> str:
+    if stat.S_ISCHR(mode):
+        return "3"
+    if stat.S_ISBLK(mode):
+        return "4"
+    if stat.S_ISFIFO(mode):
+        return "6"
+    if stat.S_ISSOCK(mode):
+        return "s"
+    return ""
 
 
 def _ignored_artifact(relative: str) -> str:

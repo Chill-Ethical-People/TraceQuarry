@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0E1626">
+  <meta name="tracequarry-csrf" content="{{CSRF_TOKEN_ATTR}}">
+  <meta name="tracequarry-profiles" content="{{THREAT_PROFILES_ATTR}}">
+  <title>TraceQuarry</title>
+  <link rel="icon" href="/favicon.svg?v=20260617f">
+  <link rel="stylesheet" href="/static/app.css?v=20260726m">
+</head>
+<body>
+  <header>
+    <div class="brand"><img class="brand-lockup" src="/assets/tracequarry-lockup.svg?v=20260617f" alt="TraceQuarry"></div>
+    <div class="header-right">
+      <div class="nav-meta"><span class="nav-dot"></span><span>Local DFIR workbench</span><kbd>uac-timeline</kbd></div>
+      <div class="parent-identity" aria-label="Chill Ethical People">
+        <img class="parent-capybara" src="/assets/cep-mark.svg?v=20260617f" alt="Chill Ethical People Capybara mark">
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="intro reveal">
+      <div>
+        <div class="eyebrow">TraceQuarry by Chill Ethical People</div>
+        <h1>Excavate the timeline. Preserve the proof.</h1>
+      </div>
+      <div class="intro-side">
+        <div class="terminal-demo" aria-label="Animated terminal showing Linux process masquerading evidence">
+          <div class="terminal-surface">
+            <div class="terminal-bar">
+              <span class="terminal-chip">λ_Terminal</span>
+              <span class="terminal-host">sec-lab</span>
+              <span class="terminal-time">15:25</span>
+            </div>
+            <div class="terminal-line line-1"><span class="terminal-prompt">λ</span> <span class="terminal-comment"># a process can fake its name (argv[0])</span></div>
+            <div class="terminal-line line-2"><span class="terminal-prompt">λ</span> <span class="terminal-cmd">exec -a '[kworker/0:2]' sleep 300 &amp;</span></div>
+            <div class="terminal-line line-3"><span class="terminal-result">[1] 19504</span></div>
+            <div class="terminal-line line-4"><span class="terminal-prompt">λ</span> <span class="terminal-cmd">tracequarry --tag process_masquerade</span></div>
+            <div class="terminal-line line-5"><span class="terminal-result">tagged: ttp.masquerading · attack.T1036</span></div>
+            <span class="terminal-cursor" aria-hidden="true"></span>
+            <span class="terminal-scan" aria-hidden="true"></span>
+          </div>
+        </div>
+        <p class="intro-copy">Parse UAC archives into a defensible Linux incident timeline. Choose one evidence source, set the incident window, add known indicators, and keep CLI-compatible outputs ready for review.</p>
+      </div>
+    </div>
+    <div class="workbench">
+    <section class="reveal">
+      <h2>Evidence Intake</h2>
+      <p class="section-lede">Use either browser upload or a server-side path. If both are filled, the selected source mode controls which input is used.</p>
+      <form id="run-form">
+        <div class="source-grid" role="radiogroup" aria-label="Evidence source mode">
+          <label class="source-card active" id="upload-card">
+            <input id="source_upload" name="source_mode" type="radio" value="upload" checked>
+            <span class="source-title">Archive upload <span class="radio-mark"></span></span>
+            <span class="source-desc">Select UAC archives, loose Linux logs, or SQLite log databases from this browser.</span>
+          </label>
+          <label class="source-card" id="path-card">
+            <input id="source_path" name="source_mode" type="radio" value="path">
+            <span class="source-title">Server path <span class="radio-mark"></span></span>
+            <span class="source-desc">Use a UAC collection, copied `/var/log` tree, loose log, or SQLite database already on this machine.</span>
+          </label>
+        </div>
+
+        <div class="field-panel" id="upload-panel">
+          <label for="uac_file">Evidence upload</label>
+          <input class="visually-hidden" id="uac_file" name="uac_file" type="file" accept=".tar,.gz,.gzip,.tgz,.zip,.log,.txt,.db,.sqlite,.sqlite3" multiple>
+          <div class="evidence-drop" id="evidence-drop" role="group" aria-label="Evidence drop zone" aria-controls="uac_file" aria-describedby="upload-selection">
+            <span class="drop-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>
+              </svg>
+            </span>
+            <span class="drop-copy">
+              <strong>Drop evidence files here</strong>
+              <span>UAC archives, rotated logs, or SQLite databases</span>
+            </span>
+            <button class="drop-browse" id="browse-upload" type="button">Browse files</button>
+          </div>
+          <div class="upload-selection" id="upload-selection" aria-live="polite">
+            <span>No evidence selected</span>
+            <button class="drop-clear" id="clear-upload" type="button" aria-label="Clear selected evidence" title="Clear selected evidence" hidden>×</button>
+          </div>
+          <div class="hint">Drop or browse for up to 1,000 files. Additional drops are added to the current selection; exact duplicates are skipped. Multiple files create a case workspace under <kbd>web_runs/outputs</kbd>.</div>
+        </div>
+
+        <div class="field-panel" id="path-panel" hidden>
+          <label for="input_path">Server-side input path</label>
+          <textarea id="input_path" name="input_path" placeholder="/cases/host01/var/log&#10;/cases/nas01/.SYNOSYSLOGDB"></textarea>
+          <div class="hint">One archive, copied log directory, loose log, or SQLite database per line. Paths must be beneath a configured <code>--input-root</code>. Multiple paths create a case workspace.</div>
+        </div>
+
+        <label for="case_name">Case name</label>
+        <input id="case_name" name="case_name" placeholder="TraceQuarry Case">
+
+        <label for="case_reference">Case reference</label>
+        <input id="case_reference" name="case_reference" placeholder="IR-2026-0711">
+        <div class="hint">Optional immutable reference for CaseWave import. TraceQuarry derives a stable <code>TQ-...</code> reference when left blank.</div>
+
+        <label for="threat_type">Assisted investigation</label>
+        <select id="threat_type" name="threat_type">
+          <option value="">No investigation profile</option>
+{{THREAT_OPTIONS}}
+        </select>
+        <div class="assist-profile" id="assist-profile" hidden>
+          <div class="assist-profile-head"><span class="assist-profile-mark"></span><strong id="assist-profile-label"></strong></div>
+          <p id="assist-profile-description"></p>
+          <small>Prioritizes evidence and analyst pivots. The full timeline and all findings remain available.</small>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="incident_start_trigger">Incident start</label>
+            <div class="tq-datetime" data-picker="incident_start">
+              <input id="incident_start" name="incident_start" type="hidden">
+              <button class="tq-dt-trigger" id="incident_start_trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="incident_start_panel">
+                <span class="tq-dt-value placeholder" id="incident_start_display">Select start time</span>
+                <span class="tq-dt-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 2v4M16 2v4M3.5 9.5h17M5.5 5h13A2.5 2.5 0 0 1 21 7.5v11A2.5 2.5 0 0 1 18.5 21h-13A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5Z"/>
+                  </svg>
+                </span>
+              </button>
+              <div class="tq-dt-panel" id="incident_start_panel" role="dialog" aria-label="Incident start picker"></div>
+            </div>
+          </div>
+          <div>
+            <label for="incident_end_trigger">Incident end</label>
+            <div class="tq-datetime align-right" data-picker="incident_end">
+              <input id="incident_end" name="incident_end" type="hidden">
+              <button class="tq-dt-trigger" id="incident_end_trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="incident_end_panel">
+                <span class="tq-dt-value placeholder" id="incident_end_display">Select end time</span>
+                <span class="tq-dt-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 2v4M16 2v4M3.5 9.5h17M5.5 5h13A2.5 2.5 0 0 1 21 7.5v11A2.5 2.5 0 0 1 18.5 21h-13A2.5 2.5 0 0 1 3 18.5v-11A2.5 2.5 0 0 1 5.5 5Z"/>
+                  </svg>
+                </span>
+              </button>
+              <div class="tq-dt-panel" id="incident_end_panel" role="dialog" aria-label="Incident end picker"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="year">Log year</label>
+            <select id="year" name="year">
+              <option value="2018">2018</option>
+              <option value="2019">2019</option>
+              <option value="2020">2020</option>
+              <option value="2021">2021</option>
+              <option value="2022">2022</option>
+              <option value="2023">2023</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+            </select>
+          </div>
+          <div>
+            <label for="timezone">Timezone</label>
+            <select id="timezone" name="timezone">
+              <option value="Asia/Hong_Kong" selected>Asia/Hong_Kong</option>
+              <option value="UTC">UTC</option>
+              <option value="Asia/Singapore">Asia/Singapore</option>
+              <option value="Asia/Taipei">Asia/Taipei</option>
+              <option value="Asia/Shanghai">Asia/Shanghai</option>
+              <option value="Asia/Tokyo">Asia/Tokyo</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Australia/Sydney">Australia/Sydney</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="range-panel" id="range-panel" hidden>
+          <h2>Parsed Evidence Range</h2>
+          <p class="section-lede" id="range-summary">No inspected range yet.</p>
+          <div class="range-grid">
+            <div class="range-item">
+              <span>Earliest</span>
+              <strong id="range-earliest">-</strong>
+            </div>
+            <div class="range-item">
+              <span>Latest</span>
+              <strong id="range-latest">-</strong>
+            </div>
+          </div>
+          <div class="coverage-readiness">
+            <div class="coverage-head"><strong>Evidence readiness</strong><span id="coverage-score">Not inspected</span></div>
+            <div class="coverage-groups" id="coverage-groups"></div>
+          </div>
+        </div>
+
+        <label for="host">Host override</label>
+        <input id="host" name="host" placeholder="linux-host01.example.invalid">
+
+        <label for="iocs">Known IoCs</label>
+        <textarea id="iocs" name="iocs" placeholder="198.51.100.50,ip,known scanner&#10;rclone,literal,tooling&#10;/tmp/.x,path,suspicious artifact"></textarea>
+        <div class="hint">One per line. Format: <code>value</code> or <code>value,kind,label</code>. Kinds: ip, domain, hash, path, literal.</div>
+
+        <div class="action-row">
+          <button id="inspect-button" class="secondary" type="button">Inspect Time Range</button>
+          <button id="run-button" type="submit">Start Analysis</button>
+        </div>
+      </form>
+    </section>
+    <section class="reveal">
+      <h2>Live Run</h2>
+      <p class="section-lede">Jobs run in the background. Results appear here as soon as the parser finishes writing the timeline, findings, IoC hits, and source index.</p>
+      <div class="case-library">
+        <div id="previous-case-picker" class="case-picker">
+          <label id="previous-case-label" for="previous-case-trigger">Previous cases</label>
+          <input id="previous-case" type="hidden" value="">
+          <button
+            id="previous-case-trigger"
+            class="case-select-trigger"
+            type="button"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="previous-case-menu"
+            aria-labelledby="previous-case-label previous-case-value"
+            disabled
+          >
+            <span class="case-select-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M3.75 7.25h6l1.75 2h8.75v8.5a2 2 0 0 1-2 2H5.75a2 2 0 0 1-2-2V7.25Z"></path>
+                <path d="M3.75 7.25v-1a2 2 0 0 1 2-2h3.5l1.75 2h7.25a2 2 0 0 1 2 2v1"></path>
+                <path d="M8 13h8M8 16h5"></path>
+              </svg>
+            </span>
+            <span class="case-select-copy">
+              <strong id="previous-case-value">Loading completed cases</strong>
+              <small id="previous-case-subtitle">Checking the local work directory</small>
+            </span>
+            <span id="previous-case-count" class="case-select-count" hidden>0</span>
+            <span class="case-select-chevron" aria-hidden="true">
+              <svg viewBox="0 0 20 20" focusable="false"><path d="m5.5 7.5 4.5 4.5 4.5-4.5"></path></svg>
+            </span>
+          </button>
+          <div
+            id="previous-case-menu"
+            class="case-select-menu"
+            role="listbox"
+            aria-labelledby="previous-case-label"
+            hidden
+          ></div>
+        </div>
+        <button id="open-previous-case" class="secondary" type="button" disabled>Open case</button>
+        <div id="previous-case-meta" class="case-library-meta">Completed outputs in this work directory remain available after restart.</div>
+      </div>
+      <div id="service-health" class="service-health" role="status">Checking service readiness...</div>
+      <div id="status" class="status">No job started.</div>
+      <div id="run-progress" class="run-progress" hidden>
+        <div class="progress-head">
+          <strong id="progress-title">Preparing parser</strong>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-steps" id="progress-steps"></div>
+      </div>
+      <div id="collection-queue" class="collection-queue" hidden>
+        <div class="queue-head">
+          <div class="queue-title">
+            <strong id="queue-title">Collection queue</strong>
+            <span class="queue-path" id="queue-path">Uploads are staged beneath the configured work directory.</span>
+          </div>
+          <input class="queue-filter" id="queue-filter" type="search" placeholder="Filter collections" aria-label="Filter collection queue">
+        </div>
+        <div class="queue-statuses" id="queue-statuses"></div>
+        <div class="queue-table-wrap">
+          <table class="queue-table">
+            <thead><tr><th>Collection</th><th>Size</th><th>Status</th><th>Progress</th></tr></thead>
+            <tbody id="queue-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="metrics" class="metrics" hidden></div>
+      <div id="run-actions" class="run-actions" hidden>
+        <button id="preview-summary" type="button">Preview Summary</button>
+        <button id="review-briefing" type="button">Incident Briefing</button>
+        <button id="explore-timeline" type="button">Explore Timeline</button>
+        <a id="export-workbook" href="#" download>Export Investigation XLSX</a>
+        <a id="export-timeline" href="#" download>Export Timeline CSV</a>
+        <a id="download-summary" href="#" target="_blank" rel="noopener">Open summary.md</a>
+      </div>
+      <ul id="files" class="files"></ul>
+      <div class="console" id="console" hidden>
+        <div class="chrome"><i></i><i></i><i></i></div>
+        <pre id="details"></pre>
+      </div>
+    </section>
+    </div>
+  </main>
+  <div id="summary-modal" class="modal-backdrop" hidden>
+    <div class="summary-modal" role="dialog" aria-modal="true" aria-labelledby="summary-modal-title">
+      <header>
+        <div class="summary-title">
+          <h2 id="summary-modal-title">TraceQuarry Summary Preview</h2>
+          <p class="summary-kicker">Analyst report view from summary.md</p>
+        </div>
+        <button id="summary-close" class="modal-close" type="button" aria-label="Close summary preview">×</button>
+      </header>
+      <div class="summary-body"><div id="summary-preview" class="summary-report"><p class="summary-empty">Loading summary...</p></div></div>
+      <div class="summary-footer">
+        <a id="summary-workbook" href="#" download>Export investigation XLSX</a>
+        <a id="summary-export" href="#" download>Export timeline CSV</a>
+        <a id="summary-open" href="#" target="_blank" rel="noopener">Open file</a>
+        <button id="summary-close-footer" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+  <div id="briefing-modal" class="modal-backdrop" hidden>
+    <div class="briefing-modal" role="dialog" aria-modal="true" aria-labelledby="briefing-modal-title">
+      <header>
+        <div class="summary-title">
+          <h2 id="briefing-modal-title">Incident Reconstruction</h2>
+          <p class="summary-kicker">Analyst-selected evidence with ATT&amp;CK phase context</p>
+        </div>
+        <button id="briefing-close" class="modal-close" type="button" aria-label="Close incident briefing">×</button>
+      </header>
+      <div id="briefing-content" class="briefing-content"><p class="summary-empty">Loading briefing...</p></div>
+      <div class="summary-footer">
+        <a id="briefing-workbook" href="#" download>Export investigation XLSX</a>
+        <a id="briefing-export" href="#" download>Export selected CSV</a>
+        <button id="briefing-close-footer" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+  <div id="timeline-modal" class="modal-backdrop" hidden>
+    <div class="timeline-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-modal-title">
+      <header>
+        <div class="summary-title">
+          <h2 id="timeline-modal-title">Evidence Timeline</h2>
+          <p class="summary-kicker">Aggregated events, raw records, provenance, and analyst annotations</p>
+        </div>
+        <button id="timeline-close" class="modal-close" type="button" aria-label="Close timeline explorer">×</button>
+      </header>
+      <div class="timeline-toolbar">
+        <input id="timeline-search" type="search" placeholder="Search raw logs, users, IPs, commands...">
+        <select id="timeline-severity" aria-label="Filter severity"><option value="">All severities</option></select>
+        <select id="timeline-source" aria-label="Filter source type"><option value="">All source types</option></select>
+        <select id="timeline-phase" aria-label="Filter ATT&amp;CK phase"><option value="">All ATT&amp;CK phases</option></select>
+        <select id="timeline-summary" aria-label="Filter summary selection"><option value="">All review states</option><option value="selected">In summary</option><option value="unselected">Not in summary</option></select>
+        <select id="timeline-scope" aria-label="Timeline scope"><option value="mini">Incident window</option><option value="full">Full timeline</option></select>
+        <a id="timeline-workbook" href="#" download>Export XLSX</a>
+        <a id="timeline-export" href="#" download>Export CSV</a>
+      </div>
+      <div class="timeline-workspace">
+        <div class="timeline-stream">
+          <div class="timeline-stream-head"><strong>Chronological evidence</strong><span id="timeline-count">Loading...</span></div>
+          <div id="timeline-list" class="timeline-list"></div>
+          <div class="timeline-pagination">
+            <button id="timeline-prev" type="button">Previous</button>
+            <span id="timeline-page">-</span>
+            <button id="timeline-next" type="button">Next</button>
+          </div>
+        </div>
+        <aside id="event-detail" class="event-detail"><div class="event-empty">Select an event to inspect its normalized fields and original raw record.</div></aside>
+      </div>
+    </div>
+  </div>
+  <script src="/static/app.js?v=20260726m"></script>
+</body>
+</html>

@@ -28,12 +28,12 @@ class RegistryError(ValueError):
     pass
 
 
-class _UniqueKeyLoader(yaml.SafeLoader):
+class UniqueKeySafeLoader(yaml.SafeLoader):
     """Safe YAML loader that refuses silently overwritten mapping keys."""
 
 
 def _construct_unique_mapping(
-    loader: _UniqueKeyLoader, node: MappingNode, deep: bool = False
+    loader: UniqueKeySafeLoader, node: MappingNode, deep: bool = False
 ) -> dict[Any, Any]:
     loader.flatten_mapping(node)
     mapping: dict[Any, Any] = {}
@@ -50,7 +50,7 @@ def _construct_unique_mapping(
     return mapping
 
 
-_UniqueKeyLoader.add_constructor(
+UniqueKeySafeLoader.add_constructor(
     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping
 )
 
@@ -62,8 +62,8 @@ def registry_path() -> Path:
 def load_registry_file(path: Path) -> dict[str, Any]:
     try:
         with path.open(encoding="utf-8") as handle:
-            # _UniqueKeyLoader inherits from SafeLoader and only rejects duplicates.
-            data = yaml.load(handle, Loader=_UniqueKeyLoader)  # nosec B506
+            # UniqueKeySafeLoader inherits SafeLoader and only rejects duplicates.
+            data = yaml.load(handle, Loader=UniqueKeySafeLoader)  # nosec B506
     except (OSError, yaml.YAMLError) as exc:
         raise RegistryError(f"Unable to load tagging registry {path}: {exc}") from exc
     return validate_registry(data)
@@ -126,56 +126,74 @@ def _validate_common_rule(
     if missing_sources:
         raise RegistryError(f"{path} references unknown sources: {missing_sources}")
 
-    if section == "tool_tags":
-        _required_text(rule, "category", path)
-        _validate_confidence(rule, "confidence_when_matched", path)
-        if not _validate_string_list(rule, "match_literals", path):
-            raise RegistryError(f"{path}.match_literals must not be empty.")
-    elif section == "ttp_tags":
-        _required_text(rule, "evidence", path)
-        _validate_severity(rule, "severity", path)
-        _validate_confidence(rule, "confidence_when_matched", path)
-        for field in (
-            "match_detection_names",
-            "match_event_actions",
-            "match_tags",
-        ):
-            _validate_string_list(rule, field, path)
-    elif section == "actor_similarity_profiles":
-        _required_text(rule, "display_name", path)
-        _required_text(rule, "analyst_warning", path)
-        cap = _required_text(rule, "confidence_cap", path)
-        if cap not in ACTOR_CONFIDENCE_CAPS:
-            raise RegistryError(
-                f"{path}.confidence_cap must be low or medium; actor profiles "
-                "cannot produce high-confidence attribution."
-            )
-        count = rule.get("required_evidence_count")
-        if not isinstance(count, int) or isinstance(count, bool) or count < 2:
-            raise RegistryError(f"{path}.required_evidence_count must be >= 2.")
-        event_count = rule.get("minimum_event_count", 2)
-        if (
-            not isinstance(event_count, int)
-            or isinstance(event_count, bool)
-            or event_count < 1
-        ):
-            raise RegistryError(f"{path}.minimum_event_count must be >= 1.")
-        if not _validate_string_list(rule, "strong_indicators", path):
-            raise RegistryError(f"{path}.strong_indicators must not be empty.")
-        _validate_string_list(rule, "supporting_indicators", path)
-        _validate_string_list(rule, "required_any_indicators", path)
-        for field, default, minimum in (
-            ("minimum_strong_indicators", 2, 1),
-            ("minimum_supporting_indicators", 1, 0),
-        ):
-            value = rule.get(field, default)
-            if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
-                raise RegistryError(f"{path}.{field} must be >= {minimum}.")
-    elif section == "malware_payload_tags":
-        _required_text(rule, "category", path)
-        _validate_confidence(rule, "confidence_when_matched", path)
-        if not _validate_string_list(rule, "match_literals", path):
-            raise RegistryError(f"{path}.match_literals must not be empty.")
+    validators = {
+        "tool_tags": _validate_tool_rule,
+        "ttp_tags": _validate_ttp_rule,
+        "actor_similarity_profiles": _validate_actor_similarity_rule,
+        "malware_payload_tags": _validate_malware_payload_rule,
+    }
+    validators[section](rule, path)
+
+
+def _validate_literal_rule(rule: dict[str, Any], path: str) -> None:
+    _required_text(rule, "category", path)
+    _validate_confidence(rule, "confidence_when_matched", path)
+    if not _validate_string_list(rule, "match_literals", path):
+        raise RegistryError(f"{path}.match_literals must not be empty.")
+
+
+def _validate_tool_rule(rule: dict[str, Any], path: str) -> None:
+    _validate_literal_rule(rule, path)
+
+
+def _validate_ttp_rule(rule: dict[str, Any], path: str) -> None:
+    _required_text(rule, "evidence", path)
+    _validate_severity(rule, "severity", path)
+    _validate_confidence(rule, "confidence_when_matched", path)
+    for field in ("match_detection_names", "match_event_actions", "match_tags"):
+        _validate_string_list(rule, field, path)
+
+
+def _validate_actor_similarity_rule(rule: dict[str, Any], path: str) -> None:
+    _required_text(rule, "display_name", path)
+    _required_text(rule, "analyst_warning", path)
+    cap = _required_text(rule, "confidence_cap", path)
+    if cap not in ACTOR_CONFIDENCE_CAPS:
+        raise RegistryError(
+            f"{path}.confidence_cap must be low or medium; actor profiles "
+            "cannot produce high-confidence attribution."
+        )
+    _validate_minimum_integer(
+        rule, "required_evidence_count", path, default=None, minimum=2
+    )
+    _validate_minimum_integer(rule, "minimum_event_count", path, default=2, minimum=1)
+    if not _validate_string_list(rule, "strong_indicators", path):
+        raise RegistryError(f"{path}.strong_indicators must not be empty.")
+    _validate_string_list(rule, "supporting_indicators", path)
+    _validate_string_list(rule, "required_any_indicators", path)
+    _validate_minimum_integer(
+        rule, "minimum_strong_indicators", path, default=2, minimum=1
+    )
+    _validate_minimum_integer(
+        rule, "minimum_supporting_indicators", path, default=1, minimum=0
+    )
+
+
+def _validate_minimum_integer(
+    rule: dict[str, Any],
+    key: str,
+    path: str,
+    *,
+    default: int | None,
+    minimum: int,
+) -> None:
+    value = rule.get(key) if default is None else rule.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+        raise RegistryError(f"{path}.{key} must be >= {minimum}.")
+
+
+def _validate_malware_payload_rule(rule: dict[str, Any], path: str) -> None:
+    _validate_literal_rule(rule, path)
 
 
 def _mapping(data: dict[str, Any], key: str, path: str) -> dict[str, Any]:

@@ -1,14 +1,24 @@
 [project]
 name = "tracequarry"
-version = "0.4.0b1"
-description = "TraceQuarry: UAC-aware Linux forensic timeline parser with TTP enrichment."
+version = "0.4.0b2"
+description = "Local-first Linux DFIR timeline parser for UAC, native logs, SQLite evidence, ATT&CK enrichment, and case correlation."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 authors = [{name = "Kensho"}]
 maintainers = [{name = "Chill Ethical People", email = "contact@chillethicalpeople.com"}]
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE", "OWNERSHIP.md"]
-keywords = ["dfir", "forensics", "incident-response", "linux", "timeline", "uac"]
+keywords = [
+    "dfir",
+    "digital-forensics",
+    "forensics",
+    "incident-response",
+    "linux",
+    "mitre-attack",
+    "sqlite",
+    "timeline",
+    "uac",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Information Technology",
@@ -19,7 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
 ]
-dependencies = ["PyYAML>=6.0.2,<7"]
+dependencies = ["PyYAML>=6.0.2,<7", "XlsxWriter>=3.2.9,<4"]
 
 [project.urls]
 Homepage = "https://github.com/Chill-Ethical-People/TraceQuarry"
@@ -45,7 +55,10 @@ dev = [
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["B", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
+select = ["B", "C90", "E4", "E7", "E9", "F", "I", "SIM", "UP"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
 [tool.mypy]
 python_version = "3.11"
@@ -85,8 +98,9 @@ uac-timeline-web = "uac_parser.web:main"
 include = ["uac_parser*"]
 
 [tool.setuptools.data-files]
-"share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/investigation_profiles.yml", "rules/README.md"]
+"share/tracequarry/rules" = ["rules/tagging_registry.yml", "rules/investigation_profiles.yml", "rules/attack_phases.yml", "rules/README.md"]
 "share/tracequarry/assets" = ["assets/cep-mark.svg", "assets/tracequarry-favicon.svg", "assets/tracequarry-lockup.svg"]
+"share/tracequarry/web" = ["web/index.html", "web/app.css", "web/app.js"]
 
 [build-system]
 requires = ["setuptools>=77"]

@@ -15,6 +15,16 @@ class CliTests(unittest.TestCase):
         result.to_dict.return_value = {"events": 7, "output_dir": "out"}
         return result
 
+    def test_help_describes_current_evidence_and_case_capabilities(self) -> None:
+        help_text = cli.build_arg_parser().format_help()
+
+        self.assertIn("usage: tracequarry", help_text)
+        self.assertIn("Linux logs", help_text)
+        self.assertIn("SQLite", help_text)
+        self.assertIn("Evidence input for case mode", help_text)
+        self.assertIn("Text file of evidence inputs", help_text)
+        self.assertIn("per line.", help_text)
+
     def test_single_collection_routes_settings_and_iocs(self) -> None:
         result = self._result()
         with (
@@ -67,6 +77,8 @@ class CliTests(unittest.TestCase):
                         "case-out",
                         "--case-name",
                         "Case 42",
+                        "--case-workers",
+                        "3",
                     ]
                 )
 
@@ -76,6 +88,7 @@ class CliTests(unittest.TestCase):
             (["first.tar.gz", "second.tar.gz", "third.tar.gz"], "case-out"),
         )
         self.assertEqual(run.call_args.kwargs["case_name"], "Case 42")
+        self.assertEqual(run.call_args.kwargs["max_workers"], 3)
 
     def test_required_arguments_have_clear_errors(self) -> None:
         with self.assertRaisesRegex(SystemExit, "requires an input path"):
