@@ -47,7 +47,7 @@ dev = [
     "pip-audit>=2.8,<3",
     "pytest>=8,<10",
     "ruff>=0.15,<0.16",
-    "twine>=6,<7",
+    "twine>=6,<8",
     "types-PyYAML>=6.0.12,<7",
 ]
 
