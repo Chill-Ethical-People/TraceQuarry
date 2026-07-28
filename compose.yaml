@@ -1,0 +1,43 @@
+name: tracequarry
+
+services:
+  tracequarry:
+    image: ${TRACEQUARRY_IMAGE:-tracequarry:local}
+    build:
+      context: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${TRACEQUARRY_BIND_ADDRESS:-127.0.0.1}:${TRACEQUARRY_PORT:-8765}:8765"
+    environment:
+      TRACEQUARRY_PUBLIC_PORT: ${TRACEQUARRY_PORT:-8765}
+    volumes:
+      - tracequarry-data:/data
+      - type: bind
+        source: ${TRACEQUARRY_EVIDENCE_DIR:-./evidence}
+        target: /evidence
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, urllib.request;
+          response = urllib.request.urlopen('http://127.0.0.1:8765/api/health', timeout=3);
+          assert response.status == 200 and json.load(response)['status'] == 'ok'
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  tracequarry-data:
+    name: tracequarry-data

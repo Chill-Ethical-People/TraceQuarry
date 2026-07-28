@@ -52,3 +52,34 @@ jobs:
           --project-name=TraceQuarry
           --target-reference=main
           --remote-repo-url=https://github.com/Chill-Ethical-People/TraceQuarry
+
+  container:
+    name: Container dependencies
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Build production container
+        run: docker build --pull --tag tracequarry:snyk .
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@9adf32b1121593767fc3c057af55b55db032dc04 # v1.0.0
+      - name: Test container for known vulnerabilities
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: >-
+          snyk container test tracequarry:snyk
+          --file=Dockerfile
+          --severity-threshold=low
+      - name: Monitor the main container baseline
+        if: github.event_name != 'pull_request'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: >-
+          snyk container monitor tracequarry:snyk
+          --file=Dockerfile
+          --project-name=TraceQuarry-container
+          --target-reference=main
+          --remote-repo-url=https://github.com/Chill-Ethical-People/TraceQuarry

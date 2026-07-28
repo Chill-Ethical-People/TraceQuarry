@@ -10,6 +10,7 @@ import time
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 from uac_parser import web
 from uac_parser.resources import resource_file
@@ -57,6 +58,9 @@ def _configure_context(
 
 
 class WebTests(unittest.TestCase):
+    def test_public_web_command_uses_tracequarry_brand(self) -> None:
+        self.assertEqual(web.build_arg_parser().prog, "tracequarry-web")
+
     def test_server_side_inputs_are_limited_to_allowed_roots(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -94,6 +98,10 @@ class WebTests(unittest.TestCase):
         self.assertIn('name="threat_type"', page)
         self.assertIn('value="ransomware_extortion"', page)
         self.assertIn("Prioritizes evidence and analyst pivots", page)
+        self.assertIn("native Linux logs", page)
+        self.assertIn("CaseWeave import", page)
+        self.assertIn("<kbd>tracequarry</kbd>", page)
+        self.assertNotIn("CaseWave", page)
         self.assertIn("Explore Timeline", page)
         self.assertIn("Incident Briefing", page)
         self.assertIn('id="timeline-phase"', page)
@@ -220,9 +228,27 @@ class WebTests(unittest.TestCase):
         self.assertTrue(_is_loopback_origin("http://localhost:8765", 8765))
         self.assertFalse(_is_loopback_origin("https://attacker.example", 8765))
 
+    def test_container_public_port_remains_loopback_only(self) -> None:
+        with mock.patch.dict(
+            web.os.environ,
+            {"TRACEQUARRY_CONTAINER": "1", "TRACEQUARRY_PUBLIC_PORT": "18765"},
+        ):
+            self.assertTrue(_is_loopback_authority("127.0.0.1:18765", 8765))
+            self.assertTrue(_is_loopback_origin("http://localhost:18765", 8765))
+            self.assertFalse(_is_loopback_authority("analyst.example:18765", 8765))
+            self.assertFalse(_is_loopback_origin("https://analyst.example:18765", 8765))
+
     def test_remote_bind_is_refused_even_with_legacy_flag(self) -> None:
         with self.assertRaisesRegex(SystemExit, "Refusing non-loopback bind"):
             web.main(["--host", "0.0.0.0", "--allow-remote"])
+
+    def test_container_bind_requires_packaged_container_marker(self) -> None:
+        with mock.patch.dict(web.os.environ, {}, clear=True):
+            self.assertFalse(web._is_packaged_container_bind("0.0.0.0", True))
+        with mock.patch.dict(web.os.environ, {"TRACEQUARRY_CONTAINER": "1"}):
+            self.assertTrue(web._is_packaged_container_bind("0.0.0.0", True))
+            self.assertFalse(web._is_packaged_container_bind("0.0.0.0", False))
+            self.assertFalse(web._is_packaged_container_bind("192.0.2.10", True))
 
     def test_timeline_preview_filters_and_saves_separate_annotations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -5,6 +5,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/ci.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/container.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/container.yml/badge.svg" alt="Container build status"></a>
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml/badge.svg" alt="Snyk Open Source status"></a>
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml/badge.svg" alt="Gitleaks secret scan status"></a>
@@ -473,10 +474,13 @@ tracequarry --case-out out/case-acme-linux \
   --timezone Asia/Hong_Kong
 ```
 
-Installed console scripts:
+Primary console scripts:
 
 - `tracequarry`
 - `tracequarry-web`
+
+Backward-compatible aliases retained for existing workflows:
+
 - `uac-timeline`
 - `uac-timeline-web`
 
@@ -784,7 +788,28 @@ workflow await their own public release.
 ## Install
 
 TraceQuarry supports Python 3.11 and 3.12. PyYAML is used to validate and load
-the external detection registry.
+the external detection registry. Choose an isolated Python installation or the
+hardened Docker Compose deployment; both preserve case data across upgrades.
+
+### Docker Compose
+
+```bash
+cp .env.example .env
+docker compose up --build --detach
+```
+
+Open `http://127.0.0.1:8765`. Browser uploads, outputs, analyst annotations, and
+the case repository persist in the `tracequarry-data` volume. Place copied
+evidence beneath `./evidence` to use it through the GUI's server-path mode; the
+container mounts that directory read-only. `docker compose down` preserves case
+data. Do not use `docker compose down -v` unless the case volume is intentionally
+being destroyed and its backup has been verified.
+
+See the [installation and persistence guide](docs/installation.md) for volume
+backup, Docker CLI use, native Linux/macOS/Windows installers, upgrades, and
+data-preserving uninstall instructions.
+
+### Python Virtual Environment
 
 ```bash
 git clone https://github.com/Chill-Ethical-People/TraceQuarry.git

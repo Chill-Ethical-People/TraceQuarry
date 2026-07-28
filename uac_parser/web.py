@@ -71,6 +71,7 @@ from uac_parser.web_timeline import (
 
 APP_CONTEXT = ApplicationContext()
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+CONTAINER_BIND_HOSTS = {"0.0.0.0", "::"}
 DEFAULT_MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024
 DEFAULT_MAX_WORK_BYTES = 40 * 1024 * 1024 * 1024
 MIN_FREE_BYTES = 512 * 1024 * 1024
@@ -83,7 +84,7 @@ DEFAULT_MAINTENANCE_INTERVAL_SECONDS = 300
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="uac-timeline-web",
+        prog="tracequarry-web",
         description="Run the TraceQuarry web GUI.",
     )
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
@@ -103,6 +104,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--allow-remote", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--container-bind", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--max-upload-gib",
         type=float,
@@ -161,7 +163,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    if args.host not in LOOPBACK_HOSTS:
+    if args.host not in LOOPBACK_HOSTS and not _is_packaged_container_bind(
+        args.host, args.container_bind
+    ):
         raise SystemExit(
             "Refusing non-loopback bind. Use an authenticated local tunnel or reverse proxy instead; "
             "TraceQuarry does not expose its evidence API directly to a network."
@@ -347,6 +351,28 @@ def _secure_directory(path: Path) -> None:
     path.chmod(0o700)
 
 
+def _is_packaged_container_bind(host: str, requested: bool) -> bool:
+    """Allow the image entrypoint to listen inside its isolated network namespace."""
+    return (
+        requested
+        and host in CONTAINER_BIND_HOSTS
+        and os.environ.get("TRACEQUARRY_CONTAINER") == "1"
+    )
+
+
+def _trusted_request_ports(server_port: int) -> set[int]:
+    ports = {server_port}
+    if os.environ.get("TRACEQUARRY_CONTAINER") != "1":
+        return ports
+    try:
+        public_port = int(os.environ.get("TRACEQUARRY_PUBLIC_PORT", ""))
+    except ValueError:
+        return ports
+    if 1 <= public_port <= 65535:
+        ports.add(public_port)
+    return ports
+
+
 def _is_loopback_authority(authority: str, server_port: int) -> bool:
     if not authority:
         return False
@@ -355,7 +381,9 @@ def _is_loopback_authority(authority: str, server_port: int) -> bool:
         port = parsed.port
     except ValueError:
         return False
-    return parsed.hostname in LOOPBACK_HOSTS and (port is None or port == server_port)
+    return parsed.hostname in LOOPBACK_HOSTS and (
+        port is None or port in _trusted_request_ports(server_port)
+    )
 
 
 def _is_loopback_origin(origin: str, server_port: int) -> bool:
@@ -367,7 +395,7 @@ def _is_loopback_origin(origin: str, server_port: int) -> bool:
     return (
         parsed.scheme in {"http", "https"}
         and parsed.hostname in LOOPBACK_HOSTS
-        and port == server_port
+        and port in _trusted_request_ports(server_port)
     )
 
 
