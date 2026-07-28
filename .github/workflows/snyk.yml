@@ -73,13 +73,3 @@ jobs:
           snyk container test tracequarry:snyk
           --file=Dockerfile
           --severity-threshold=low
-      - name: Monitor the main container baseline
-        if: github.event_name != 'pull_request'
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: >-
-          snyk container monitor tracequarry:snyk
-          --file=Dockerfile
-          --project-name=TraceQuarry-container
-          --target-reference=main
-          --remote-repo-url=https://github.com/Chill-Ethical-People/TraceQuarry
