@@ -39,7 +39,7 @@ remains loopback-only and must not be exposed directly to a LAN or the Internet.
   bundle with complete evidence inventory, dataset hashes, source locators or
   exact raw records, and non-authoritative timeline/finding candidates. The
   CaseWeave importer and end-to-end workflow remain pending CaseWeave's public
-  release and are outside TraceQuarry's supported public-beta feature set.
+  release and are outside TraceQuarry's supported Production Preview feature set.
 
 ## Recommended Start Command
 

@@ -9,13 +9,16 @@
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/codeql.yml/badge.svg" alt="CodeQL status"></a>
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/snyk.yml/badge.svg" alt="Snyk Open Source status"></a>
   <a href="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml"><img src="https://github.com/Chill-Ethical-People/TraceQuarry/actions/workflows/secret-scan.yml/badge.svg" alt="Gitleaks secret scan status"></a>
+  <a href="docs/PRODUCTION_PREVIEW.md"><img src="https://img.shields.io/badge/release-Production%20Preview-E9A83F.svg" alt="Production Preview release status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-5C7F67.svg" alt="Apache-2.0 license"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
 
-> **Public beta 0.4.0-beta.2:** an open-source Linux DFIR timeline parser for
-> UAC collections, native Linux logs, and supported SQLite forensic data.
-> Read the [0.4.0-beta.2 release notes](docs/releases/v0.4.0-beta.2.md).
+> **Production Preview:** a production-capable, local-first Linux DFIR timeline
+> parser for controlled analyst workstations and isolated investigation labs.
+> The current technical baseline is `0.4.0-beta.2`; read the
+> [release notes](docs/releases/v0.4.0-beta.2.md) and
+> [Production Preview operating boundary](docs/PRODUCTION_PREVIEW.md).
 
 TraceQuarry is a local-first Linux digital forensics and incident response
 (DFIR) workbench. It converts
@@ -34,7 +37,7 @@ source provenance while organizing authentication, execution, persistence,
 privilege escalation, credential access, discovery, lateral movement,
 exfiltration, and impact signals into analyst-reviewable outputs.
 
-| Area | Public beta capability |
+| Area | Production Preview capability |
 | --- | --- |
 | Product category | Open-source Linux forensic timeline parser and DFIR triage workbench |
 | Evidence inputs | UAC archives and directories, copied Linux logs, compressed rotations, and supported SQLite databases |
@@ -42,9 +45,9 @@ exfiltration, and impact signals into analyst-reviewable outputs.
 | Analysis | Assisted investigation profiles, MITRE ATT&CK phase tagging, tool/TTP enrichment, and cross-collection correlation |
 | Interfaces | Command-line interface and loopback-only local web GUI |
 | Evidence privacy | Local processing; no external evidence upload is required |
-| Release status | Public beta for responder testing and feedback |
+| Release status | Production Preview for controlled local DFIR deployments |
 
-## Public Beta Highlights
+## Production Preview Highlights
 
 - Build one defensible UTC-normalized timeline from a UAC collection or loose
   Linux evidence while retaining raw records, source paths, hashes, timestamp
@@ -60,6 +63,21 @@ exfiltration, and impact signals into analyst-reviewable outputs.
   tools, malware and payload signals, TTPs, ATT&CK phases, and non-attributive
   actor-profile similarity.
 
+## Supported Production Use
+
+TraceQuarry Production Preview is intended for a single analyst or trusted DFIR
+team operating it on a controlled workstation, forensic lab host, or the
+hardened loopback-only Docker deployment. Preserve original evidence separately,
+back up the case repository, review parser coverage and errors, and validate
+decisive findings against raw source records before reporting them.
+
+TraceQuarry is not currently an authenticated multi-user service and must not be
+exposed directly to a LAN or the Internet. Native RBAC, centralized tenancy,
+high-availability operation, and the CaseWeave collaborative workflow are not
+part of the supported Production Preview boundary. See
+[`docs/PRODUCTION_PREVIEW.md`](docs/PRODUCTION_PREVIEW.md) for deployment and
+support details.
+
 ## Coming Next: CaseWeave Integration
 
 TraceQuarry and CaseWeave are being designed to connect forensic collection
@@ -72,7 +90,7 @@ decisions.
 The current TraceQuarry build emits an **experimental developer-preview bundle**
 for contract testing. The CaseWeave importer and end-to-end user integration are
 pending their own public release and are not part of TraceQuarry's supported
-public-beta workflow yet. Follow the project for the full integration.
+Production Preview workflow yet. Follow the project for the full integration.
 
 ## Relationship To UAC
 
@@ -93,7 +111,7 @@ Never attach real incident collections or sensitive evidence to a public issue.
 TraceQuarry can also process an extracted directory, archive, individual Linux
 log, compressed rotation, or supported SQLite database even when it was not
 produced by UAC. Generic evidence intake is filename- and format-driven;
-arbitrary source mappings remain outside the public-beta interface.
+arbitrary source mappings remain outside the Production Preview interface.
 
 ## Guided Walkthrough
 
@@ -884,8 +902,8 @@ opening public issues or pull requests.
 
 ## Community Acknowledgments
 
-This public beta was strengthened by practical responder feedback and hands-on
-testing. Thank you to
+This Production Preview was strengthened by practical responder feedback and
+hands-on testing. Thank you to
 [James Navarro](https://www.linkedin.com/in/james-navarro-161955196/),
 [Jacob W](https://www.linkedin.com/in/jacob-w-491ab28/), and
 [Kaylin Malutich](https://www.linkedin.com/in/kaylin-malutich-0210a449/) for

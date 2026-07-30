@@ -2,7 +2,7 @@
 
 > **Developer preview:** CaseWeave is pending its own public release. TraceQuarry
 > currently emits this bundle for contract validation; the end-to-end importer
-> and collaborative workflow are not yet a supported public-beta feature.
+> and collaborative workflow are not yet a supported Production Preview feature.
 
 TraceQuarry emits a versioned CaseWeave producer-preview bundle for every parsed
 collection. The bundle is a future integration handoff, not an analyst decision log:

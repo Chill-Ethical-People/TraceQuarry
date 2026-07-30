@@ -52,9 +52,9 @@ CodeQL, and dependency review. CodeQL and dependency review automatically
 activate for public repository events.
 
 Confirm all six required checks pass on a public test pull request before
-publishing the beta release announcement.
+publishing the Production Preview announcement.
 
-## First Beta Release
+## Production Preview Release
 
 1. Confirm `pyproject.toml` and `uac_parser/__init__.py` contain the intended
    version.
