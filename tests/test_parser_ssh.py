@@ -19,7 +19,14 @@ class AuthorizedKeysTests(unittest.TestCase):
             ('command="id",no-pty\tssh-ed25519 AAAA # note', "ssh-ed25519", "# note"),
             ("ssh-ed25519 AAAA text,with\ttabs", "ssh-ed25519", "text,with\ttabs"),
             ("malformed !,!,", "", ""),
-            ('command="echo hello" ssh-rsa AAAA', "", ""),
+            ('command="echo hello" ssh-rsa AAAA', "ssh-rsa", None),
+            (
+                'command="echo\thello" ssh-ed25519 AAAA operator',
+                "ssh-ed25519",
+                "operator",
+            ),
+            ('command="echo \\"hello\\"",no-pty ssh-rsa AAAA note', "ssh-rsa", "note"),
+            ('command="unterminated ssh-ed25519 AAAA tail', "", ""),
             ("sk-ssh-ed25519@openssh.com AAAA", "", ""),
         ]
         with tempfile.TemporaryDirectory() as directory:

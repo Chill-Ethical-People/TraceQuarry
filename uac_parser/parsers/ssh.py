@@ -8,8 +8,27 @@ from uac_parser.timeline.event import TimelineEvent
 from .common import read_text_lines
 
 KEY_RE = re.compile(
-    r"^(?P<opts>\S+\s+)?(?P<type>ssh-[a-z0-9-]+|ecdsa-[a-z0-9-]+|sk-[a-z0-9-]+)\s+(?P<key>\S+)(?:\s+(?P<comment>.*))?$"
+    r"^(?P<type>ssh-[a-z0-9-]+|ecdsa-[a-z0-9-]+|sk-[a-z0-9-]+)\s+(?P<key>\S+)(?:\s+(?P<comment>.*))?$"
 )
+
+
+def _match_authorized_key(text: str) -> re.Match[str] | None:
+    match = KEY_RE.match(text)
+    if match:
+        return match
+    # Options end at unquoted whitespace; scan once without regex backtracking.
+    quoted = False
+    escaped = False
+    for index, character in enumerate(text):
+        if escaped:
+            escaped = False
+        elif quoted and character == "\\":
+            escaped = True
+        elif character == '"':
+            quoted = not quoted
+        elif character.isspace() and not quoted:
+            return KEY_RE.match(text[index:].lstrip())
+    return None
 
 
 def parse_authorized_keys(
@@ -20,7 +39,7 @@ def parse_authorized_keys(
         text = raw.strip()
         if not text or text.startswith("#"):
             continue
-        match = KEY_RE.match(text)
+        match = _match_authorized_key(text)
         detections = ["authorized_key_present"]
         severity = "informational"
         tags = ["ssh", "authorized_keys", "persistence_candidate"]
