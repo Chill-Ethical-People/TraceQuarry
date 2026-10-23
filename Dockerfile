@@ -23,7 +23,7 @@ ARG TRACEQUARRY_UID=10001
 ARG TRACEQUARRY_GID=10001
 
 LABEL org.opencontainers.image.title="TraceQuarry" \
-      org.opencontainers.image.description="Local-first Linux DFIR timeline workbench" \
+      org.opencontainers.image.description="Local-first Linux and ESXi DFIR timeline workbench" \
       org.opencontainers.image.source="https://github.com/Chill-Ethical-People/TraceQuarry" \
       org.opencontainers.image.licenses="Apache-2.0"
 

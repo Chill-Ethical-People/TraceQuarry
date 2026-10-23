@@ -14,16 +14,17 @@
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776AB.svg" alt="Python 3.11 and 3.12"></a>
 </p>
 
-> **Production Preview:** a production-capable, local-first Linux DFIR timeline
+> **Production Preview:** a production-capable, local-first Linux and ESXi DFIR timeline
 > parser for controlled analyst workstations and isolated investigation labs.
 > The current technical baseline is `0.4.0-beta.2`; read the
 > [release notes](docs/releases/v0.4.0-beta.2.md) and
 > [Production Preview operating boundary](docs/PRODUCTION_PREVIEW.md).
 
-TraceQuarry is a local-first Linux digital forensics and incident response
+TraceQuarry is a local-first Linux and VMware ESXi digital forensics and incident response
 (DFIR) workbench. It converts
 [Unix-like Artifacts Collector (UAC)](https://github.com/tclahr/uac) archives,
-copied `/var/log` trees, compressed or rotated Linux logs, and supported SQLite
+copied `/var/log` trees, compressed or rotated Linux logs, individual ESXi
+`vm-support` bundles, and supported SQLite
 databases into normalized forensic timelines, source coverage indexes, IoC
 matches, MITRE ATT&CK context, and evidence-backed findings.
 
@@ -39,8 +40,8 @@ exfiltration, and impact signals into analyst-reviewable outputs.
 
 | Area | Production Preview capability |
 | --- | --- |
-| Product category | Open-source Linux forensic timeline parser and DFIR triage workbench |
-| Evidence inputs | UAC archives and directories, copied Linux logs, compressed rotations, and supported SQLite databases |
+| Product category | Open-source Linux and ESXi forensic timeline parser and DFIR triage workbench |
+| Evidence inputs | UAC archives and directories, copied Linux logs, individual ESXi `vm-support` bundles, compressed rotations, and supported SQLite databases |
 | Investigation outputs | CSV and JSONL timelines, findings, IoC hits, source coverage, incident summaries, and XLSX briefing workbooks |
 | Analysis | Assisted investigation profiles, MITRE ATT&CK phase tagging, tool/TTP enrichment, and cross-collection correlation |
 | Interfaces | Command-line interface and loopback-only local web GUI |
@@ -50,7 +51,7 @@ exfiltration, and impact signals into analyst-reviewable outputs.
 ## Production Preview Highlights
 
 - Build one defensible UTC-normalized timeline from a UAC collection or loose
-  Linux evidence while retaining raw records, source paths, hashes, timestamp
+  Linux/ESXi evidence while retaining raw records, source paths, hashes, timestamp
   confidence, and collection provenance.
 - Combine multiple collections into a case workspace with per-host outputs,
   cross-host correlation, case summaries, and bounded parallel parsing.
@@ -328,9 +329,28 @@ workbook with these linked sheets:
   normalized timeline and analyst columns.
 - `Findings`: parser findings with severity, confidence, tags, IoCs, and related
   event IDs.
+- `Export Guide`: export scope, applied timeline filters, row counts, and the
+  meaning of machine mappings versus saved analyst annotations.
+
+The main result-panel workbook exports the full normalized chronology across
+all collections. The Timeline explorer's workbook uses its selected scope and
+filters. ATT&CK phases, technique IDs (`mitre`), and analyst tags are placed near
+the start of each timeline sheet and can be filtered in Excel. Blank ATT&CK
+fields mean no mapping was assigned to that event; they do not establish that
+an event is benign. Save annotations before exporting. Tags alone do not add
+an event to Selected Timeline: also select **Include in reconstructed summary**.
+Selected Timeline includes all saved selections in the chosen scope, independent
+of search filters and the 500-event briefing preview limit.
 
 The same executive briefing is previewed in the GUI before export. Spreadsheet
 formula and automatic hyperlink interpretation are disabled for evidence values.
+
+**Download All Results ZIP** creates one analyst handoff containing the current
+review CSV, investigation workbook, summaries, findings, manifests, indexes,
+annotations, audit records, and per-collection analysis outputs. The included
+`bundle_manifest.json` records its contents. Original-evidence and nested
+CaseWeave source packages stay as separate downloads so the bundle does not
+silently duplicate retained evidence.
 
 ## Choosing Time Settings
 
@@ -612,15 +632,22 @@ shared-service limitations are documented in
 
 ## Direct Logs And SQLite
 
-TraceQuarry accepts a UAC archive, an extracted collection, a copied Linux log
-directory such as `host01/var/log`, or a single loose log. Plain text and gzip,
-bzip2, and xz rotations are decoded by content. When using the GUI, the copied
-evidence directory must be beneath a configured `--input-root`.
+TraceQuarry accepts a UAC archive, an extracted collection, an individual ESXi
+`vm-support` `.tgz`, a copied Linux log directory such as `host01/var/log`, or a
+single loose log. Plain text and gzip, bzip2, and xz rotations are decoded by
+content. When using the GUI, the copied evidence directory must be beneath a
+configured `--input-root`.
 
 ```bash
 python3 -m uac_parser.cli /cases/host01/var/log --out out/host01-logs \
   --year 2026 --timezone UTC
+
+python3 -m uac_parser.cli /cases/esx-host01-vm-support.tgz \
+  --out out/esx-host01
 ```
+
+ESXi timestamps are normalized from the explicit UTC offsets in the source;
+`--year` and `--timezone` are only needed for yearless local-time Linux logs.
 
 SQLite databases are recognized from the `SQLite format 3` file signature, so
 extensionless Synology files such as `.SYNOCONNDB` and `.SYNOSYSLOGDB` can be
@@ -644,10 +671,34 @@ workspace. For an interactive workflow on comparable hardware, start with a
 50,000-event ceiling and run unusually large jobs one at a time. Output volume,
 event mix, IoC count, and free disk can lower the practical limit.
 
-Native ESXi logs are not currently parsed. TraceQuarry can inventory and hash
-unmatched ESXi evidence, but `vmkernel.log`, `hostd.log`, `vpxa.log`,
-`vobd.log`, and `fdm.log` require dedicated adapters before they can contribute
-timeline events or findings. See the
+Native ESXi parsing is selective and timeline-oriented. Upload each `vm-support`
+`.tgz` directly; TraceQuarry recognizes current and gzip/bzip2/xz rotated
+`auth`, `shell`, `hostd`, `vpxa`, `vobd`, `vmkernel`/`vmkwarning`, `fdm`,
+`syslog`, `esxupdate`, and `vmksummary` logs. It normalizes high-value
+authentication, shell command, remote-service, management, security
+configuration, update, host lifecycle, HA, network, and storage events while
+retaining the raw record and source hash. Routine hypervisor chatter remains in
+the preserved source rather than flooding the timeline.
+
+ESXi investigation coverage also includes SFTP session/file operations and
+server-reported transfer byte counts; SSH authentication methods; hostd web/API
+sessions and task outcomes; selected proxy/access-service records; SSH key-write
+fingerprints; VMkatz invocation attempts; datastore-targeting scripts; log/history
+truncation; and standalone ConfigStore password last-change metadata. Behavioral
+tags are mapped through the contributor-maintained YAML registry. A login, tool
+invocation, file-open request, or script name is **not** proof of malicious intent,
+successful credential theft, exfiltration, or encryption.
+
+The full timeline is a **selected normalized evidence chronology**, not every
+line of every ESXi log and not a completed analyst reconstruction. Use saved
+analyst selections and notes for the reconstructed chronology. Newly added
+parsers require a new parse; exporting an old case does not reprocess its source
+evidence. See [ESXi coverage and evidence limits](docs/ESXI_COVERAGE.md).
+
+An outer ZIP containing multiple nested `vm-support` archives is inventoried but
+not recursively expanded. Extract that ZIP first and upload the desired `.tgz`
+files individually (or as separate case inputs). Treat ESXi detections as triage
+leads and validate decisive conclusions against the original logs. See the
 [capacity test report](docs/performance/LOAD_TEST_2026-07-21.md) for measured
 results, methodology, caveats, and reproduction instructions. The separate
 [high-volume browser UAT](docs/performance/HIGH_VOLUME_UPLOAD_UAT_2026-07-23.md)
@@ -655,7 +706,7 @@ documents the staged 150-archive workflow and its narrower interpretation.
 
 ## Detection Coverage
 
-Current coverage is tuned for Linux intrusion triage:
+Current coverage is tuned for Linux and ESXi intrusion triage:
 
 - Evidence handling: plain text plus gzip, bzip2, and xz compressed rotations;
   direct copied log directories, loose log files, and bounded read-only SQLite
@@ -684,6 +735,10 @@ Current coverage is tuned for Linux intrusion triage:
 - Exfiltration and tooling: `rclone`, cloud CLIs, archive utilities, database
   dumps, tunneling tools, miners, destructive commands, and ransomware-impact
   indicators
+- ESXi: SSH authentication, timestamped ESXi Shell commands, SSH-key and
+  `execInstalledOnly` changes, remote-service enablement, destructive VM
+  administration, firewall and VIB/profile changes, vCenter/HA status, storage
+  path loss, network link events, and host boot/reboot/shutdown activity
 - Audit and account lifecycle: auditd account events, passwd/shadow/group backup
   comparisons, created/deleted/modified accounts, password changes, account
   unlocks, and privileged group additions
@@ -706,6 +761,18 @@ profiles are consolidated in `rules/tagging_registry.yml`. Tool and TTP rules
 enrich events at runtime; actor profiles prioritize combinations of observed
 signals without claiming attribution. The registry hash is preserved in the run
 manifest so analysts can identify the exact detection content used for a case.
+Qualified `actor_similarity.*` labels also appear on the supporting timeline
+rows and survive CSV, JSONL and investigation-XLSX export; unrelated rows are not
+labelled. No match means the configured thresholds were not met, not that an
+intrusion has been ruled out.
+
+Explicit ESXi payload selectors emit `payload_candidate.*`, separately from
+actor tags. VMkatz has a dedicated tool label, and a bounded same-host ransomware
+tradecraft profile is actor-neutral. Every new parse includes a profile-assessment
+JSON and a summary section. Broad malware catalogue entries without an
+`esxi_match` selector remain research metadata, not active signatures. Read the
+[ESXi research and evidence boundaries](docs/ESXI_THREAT_RESEARCH.md).
+
 Technique-to-tactic mappings are independently versioned in
 `rules/attack_phases.yml`, pinned to MITRE ATT&CK v19.1, validated with the same
 rules command, and fingerprinted in each run manifest.
@@ -772,8 +839,8 @@ Avoid overclaiming:
 ### Does TraceQuarry require a UAC collection?
 
 No. UAC is the primary collection format, but TraceQuarry also accepts copied
-Linux log directories, individual recognizable logs, compressed rotations, and
-supported SQLite log databases.
+Linux log directories, individual recognizable logs, compressed rotations,
+individual ESXi `vm-support` bundles, and supported SQLite log databases.
 
 ### Does TraceQuarry upload forensic evidence to the cloud?
 

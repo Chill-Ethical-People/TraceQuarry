@@ -100,7 +100,42 @@ def validate_registry(data: Any) -> dict[str, Any]:
             rule = _rule_mapping(raw_rule, f"{section}.{rule_id}")
             _validate_common_rule(section, rule_id, rule, sources)
 
+    if "esxi_behavior_profiles" in data:
+        _validate_esxi_behavior_profiles(data, sources)
+
     return data
+
+
+def _validate_esxi_behavior_profiles(
+    data: dict[str, Any], sources: dict[str, Any]
+) -> None:
+    for profile_id, raw in _mapping(data, "esxi_behavior_profiles", "registry").items():
+        _validate_rule_id(profile_id, "esxi_behavior_profiles")
+        path = f"esxi_behavior_profiles.{profile_id}"
+        profile = _rule_mapping(raw, path)
+        for field in ("display_name", "analyst_warning"):
+            _required_text(profile, field, path)
+        for field, minimum in (
+            ("window_hours", 1),
+            ("minimum_event_count", 3),
+            ("minimum_supporting_stages", 2),
+        ):
+            _validate_minimum_integer(
+                profile, field, path, default=None, minimum=minimum
+            )
+        if profile["window_hours"] > 168:
+            raise RegistryError(f"{path}.window_hours cannot exceed 168.")
+        if not _validate_string_list(profile, "anchor_detections", path):
+            raise RegistryError(f"{path} requires anchor_detections.")
+        stages = _mapping(profile, "supporting_stages", path)
+        if len(stages) < profile["minimum_supporting_stages"]:
+            raise RegistryError(f"{path} has insufficient supporting stages.")
+        for stage in stages:
+            if not _validate_string_list(stages, stage, path):
+                raise RegistryError(f"{path}.{stage} must not be empty.")
+        refs = _validate_string_list(profile, "source_refs", path)
+        if not refs or set(refs) - set(sources):
+            raise RegistryError(f"{path} requires valid source_refs.")
 
 
 def _validate_common_rule(
@@ -119,6 +154,7 @@ def _validate_common_rule(
     if _required_text(rule, "namespace", path) != expected_namespace:
         raise RegistryError(f"{path}.namespace must be {expected_namespace!r}.")
     _validate_string_list(rule, "mitre", path, attack_ids=True)
+    _validate_string_list(rule, "mitre_candidates", path, attack_ids=True)
     _validate_string_list(rule, "mitre_focus", path, attack_ids=True)
     source_refs = _validate_string_list(rule, "source_refs", path)
     source_refs += _validate_string_list(rule, "actor_refs", path)
@@ -144,6 +180,7 @@ def _validate_literal_rule(rule: dict[str, Any], path: str) -> None:
 
 def _validate_tool_rule(rule: dict[str, Any], path: str) -> None:
     _validate_literal_rule(rule, path)
+    _validate_string_list(rule, "required_detection_names", path)
 
 
 def _validate_ttp_rule(rule: dict[str, Any], path: str) -> None:
@@ -194,6 +231,32 @@ def _validate_minimum_integer(
 
 def _validate_malware_payload_rule(rule: dict[str, Any], path: str) -> None:
     _validate_literal_rule(rule, path)
+    if "esxi_match" not in rule:
+        return
+    match = _mapping(rule, "esxi_match", path)
+    allowed = {
+        "executables",
+        "artifact_names",
+        "artifact_suffixes",
+        "required_arguments",
+        "require_vmfs_target",
+    }
+    if set(match) - allowed:
+        raise RegistryError(f"{path}.esxi_match contains unsupported fields.")
+    selectors = []
+    for field in (
+        "executables",
+        "artifact_names",
+        "artifact_suffixes",
+        "required_arguments",
+    ):
+        selectors += _validate_string_list(match, field, path + ".esxi_match")
+    if not selectors:
+        raise RegistryError(f"{path}.esxi_match must contain explicit selectors.")
+    if not isinstance(match.get("require_vmfs_target", False), bool):
+        raise RegistryError(f"{path}.esxi_match.require_vmfs_target must be boolean.")
+    if not rule.get("source_refs"):
+        raise RegistryError(f"{path}.esxi_match requires source_refs.")
 
 
 def _mapping(data: dict[str, Any], key: str, path: str) -> dict[str, Any]:

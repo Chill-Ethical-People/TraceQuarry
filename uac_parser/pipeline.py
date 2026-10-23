@@ -28,6 +28,7 @@ from uac_parser.enrich.attack_phases import (
     enrich_attack_phases,
 )
 from uac_parser.enrich.correlation import correlate_state_events
+from uac_parser.enrich.esxi_profiles import profile_assessment
 from uac_parser.enrich.iocs import Ioc, ioc_finding, match_iocs, write_ioc_hits
 from uac_parser.enrich.rule_registry import registry_path
 from uac_parser.enrich.storylines import build_storylines
@@ -51,6 +52,7 @@ from uac_parser.parsers import (
     auditd,
     auth,
     bodyfile,
+    esxi,
     journal,
     persistence,
     privilege,
@@ -80,9 +82,10 @@ from uac_parser.timeline.event import TimelineEvent
 from uac_parser.timeline.timestamp import parse_iso
 
 ProgressCallback = Callable[[dict[str, Any]], None]
+SourceParser = Callable[..., list[TimelineEvent]]
 
 
-PARSER_DISPATCH = {
+PARSER_DISPATCH: dict[str, SourceParser] = {
     "bodyfile": bodyfile.parse,
     "bodyfile_privilege": privilege.parse_bodyfile_privilege,
     "auth_log": auth.parse,
@@ -113,6 +116,18 @@ PARSER_DISPATCH = {
     "netstat_output": parse_netstat,
     "ps_output": parse_ps,
     "sqlite_log": sqlite_log.parse,
+    "esxi_auth_log": esxi.parse,
+    "esxi_shell_log": esxi.parse,
+    "esxi_hostd_log": esxi.parse,
+    "esxi_vpxa_log": esxi.parse,
+    "esxi_vobd_log": esxi.parse,
+    "esxi_vmkernel_log": esxi.parse,
+    "esxi_fdm_log": esxi.parse,
+    "esxi_syslog_log": esxi.parse,
+    "esxi_update_log": esxi.parse,
+    "esxi_summary_log": esxi.parse,
+    "esxi_proxy_log": esxi.parse,
+    "esxi_auth_service_log": esxi.parse,
 }
 
 
@@ -570,6 +585,10 @@ def run_case_pipeline(
     write_json(
         output_dir / "case_findings.json",
         {"findings": findings, "storylines": storylines, "correlations": correlations},
+    )
+    write_json(
+        output_dir / "case_profile_assessment.json",
+        profile_assessment(analysis_events, findings),
     )
     write_json(
         output_dir / "case_source_index.json",
@@ -1120,6 +1139,15 @@ def _write_collection_outputs(
         {"findings": analysis.findings, "storylines": analysis.storylines},
     )
     write_json(
+        output_dir / "profile_assessment.json",
+        profile_assessment(
+            _analysis_scope(
+                analysis.full_events, analysis.mini_events, bool(start or end)
+            ),
+            analysis.findings,
+        ),
+    )
+    write_json(
         output_dir / "source_index.json",
         {
             "root": analysis.root,
@@ -1174,13 +1202,22 @@ def _write_collection_outputs(
 
 
 def _parse_source(
-    parser: Callable[..., list[TimelineEvent]],
+    parser: SourceParser,
     source: SourceFile,
     host: str,
     year: int | None,
     timezone_name: str,
 ) -> list[TimelineEvent]:
-    if source.source_type in {
+    if source.source_type.startswith("esxi_"):
+        parsed = parser(
+            source.path,
+            source.relative,
+            host=host,
+            year=year,
+            timezone_name=timezone_name,
+            coverage=source.parse_coverage,
+        )
+    elif source.source_type in {
         "auth_log",
         "syslog",
         "cron",
@@ -1344,6 +1381,13 @@ def _collection_host(
     observed = sorted({event.host for event in events if event.host})
     if observed:
         return observed[0]
+    esxi_name = re.match(
+        r"^esx-(?P<host>.+?)-\d{4}-\d{2}-\d{2}--",
+        collection_name,
+        re.IGNORECASE,
+    )
+    if esxi_name:
+        return esxi_name.group("host")
     return collection_name or collection_id
 
 
@@ -1850,6 +1894,7 @@ def _source_record(source: SourceFile) -> dict[str, Any]:
         "parser_status": source.parser_status,
         "event_count": source.event_count,
         "parser_error": source.parser_error,
+        "parse_coverage": source.parse_coverage,
     }
 
 
@@ -1884,11 +1929,16 @@ def _sync_evidence_coverage(
             evidence.coverage_status = "error"
             evidence.coverage_reason = "At least one matched parser failed."
         elif "parsed" in statuses:
+            limited = any(source.parse_coverage.get("truncated") for source in matched)
             evidence.coverage_status = (
-                "parsed" if statuses == {"parsed"} else "partially_parsed"
+                "parsed"
+                if statuses == {"parsed"} and not limited
+                else "partially_parsed"
             )
             evidence.coverage_reason = (
-                "All matched parser views completed."
+                "A parser reached its event limit; later records were not examined."
+                if limited
+                else "All matched parser views completed."
                 if evidence.coverage_status == "parsed"
                 else "A parser view completed while another view is unsupported."
             )

@@ -15,6 +15,7 @@ import threading
 import time
 import traceback
 import uuid
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, tzinfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -798,6 +799,17 @@ class UacWebHandler(BaseHTTPRequestHandler):
             except (ValueError, FileNotFoundError) as exc:
                 self._send_json({"error": str(exc)}, status=404)
             return True
+        bundle_match = re.fullmatch(r"/api/job/([a-f0-9]{12})/outputs\.zip", path)
+        if bundle_match:
+            try:
+                self._serve_result_bundle(bundle_match.group(1))
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json({"error": str(exc)}, status=404)
+            except OSError:
+                self._send_json(
+                    {"error": "Unable to build the result bundle."}, status=500
+                )
+            return True
         briefing_match = re.fullmatch(r"/api/job/([a-f0-9]{12})/briefing", path)
         if briefing_match:
             try:
@@ -1322,6 +1334,9 @@ class UacWebHandler(BaseHTTPRequestHandler):
                 ),
                 timeline_fields=CSV_EXPORT_FIELDS,
                 findings=findings,
+                selected_rows=_iter_review_rows(
+                    path, annotations, summary_filter="selected"
+                ),
                 filters={
                     "search": search,
                     "severity": severity,
@@ -1338,6 +1353,35 @@ class UacWebHandler(BaseHTTPRequestHandler):
             self.send_header(
                 "Content-Disposition",
                 'attachment; filename="tracequarry-investigation.xlsx"',
+            )
+            self.send_header("Content-Length", str(temporary_path.stat().st_size))
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.end_headers()
+            with temporary_path.open("rb") as handle:
+                shutil.copyfileobj(handle, self.wfile)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
+
+    def _serve_result_bundle(self, job_id: str) -> None:
+        output_dir = _job_output_dir(job_id)
+        export_dir = _work_dir() / ".exports"
+        _secure_directory(export_dir)
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="tracequarry-results-",
+                suffix=".zip",
+                dir=export_dir,
+                delete=False,
+            ) as handle:
+                temporary_path = Path(handle.name)
+            _write_result_bundle(temporary_path, output_dir, job_id)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header(
+                "Content-Disposition",
+                'attachment; filename="tracequarry-results.zip"',
             )
             self.send_header("Content-Length", str(temporary_path.stat().st_size))
             self.send_header("Cache-Control", "no-store, max-age=0")
@@ -2181,6 +2225,91 @@ def _incident_briefing(job_id: str, requested_scope: str = "mini") -> dict[str, 
         case_name,
         requested_scope,
     )
+
+
+_RESULT_BUNDLE_EXCLUSIONS = {
+    "caseweave_import_bundle.zip": (
+        "Nested CaseWeave archive; download it separately when needed."
+    ),
+    "caseweave_source_package.tar": (
+        "Source-evidence package; kept separate to avoid duplicating evidence."
+    ),
+}
+
+
+def _write_result_bundle(target: Path, output_dir: Path, job_id: str) -> None:
+    """Package analyst deliverables without duplicating retained source evidence."""
+    timeline_path, timeline_scope = _timeline_file(output_dir, "full")
+    annotations = _load_annotations(output_dir).get("annotations", {})
+    if not isinstance(annotations, dict):
+        annotations = {}
+    briefing = _incident_briefing(job_id, timeline_scope)
+    findings = _findings_for_output(output_dir)
+    export_dir = target.parent
+    csv_path = export_dir / f".{target.stem}-timeline.csv"
+    workbook_path = export_dir / f".{target.stem}-investigation.xlsx"
+    included: list[str] = []
+    excluded: list[dict[str, str]] = []
+    try:
+        with csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, CSV_EXPORT_FIELDS)
+            writer.writeheader()
+            writer.writerows(_iter_review_rows(timeline_path, annotations))
+        write_investigation_workbook(
+            workbook_path,
+            case_name=str(briefing.get("case_name") or f"Case {job_id}"),
+            briefing=briefing,
+            timeline_rows=_iter_review_rows(timeline_path, annotations),
+            timeline_fields=CSV_EXPORT_FIELDS,
+            findings=findings,
+            selected_rows=_iter_review_rows(
+                timeline_path, annotations, summary_filter="selected"
+            ),
+        )
+        with zipfile.ZipFile(
+            target,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+            allowZip64=True,
+        ) as archive:
+            archive.write(csv_path, "tracequarry-timeline.csv")
+            archive.write(workbook_path, "tracequarry-investigation.xlsx")
+            included.extend(
+                ["tracequarry-timeline.csv", "tracequarry-investigation.xlsx"]
+            )
+            for path in sorted(output_dir.rglob("*")):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                relative = path.relative_to(output_dir)
+                if any(part.startswith(".") for part in relative.parts):
+                    continue
+                reason = _RESULT_BUNDLE_EXCLUSIONS.get(path.name)
+                if reason:
+                    excluded.append({"path": relative.as_posix(), "reason": reason})
+                    continue
+                archive_name = (Path("artifacts") / relative).as_posix()
+                archive.write(path, archive_name)
+                included.append(archive_name)
+            manifest = {
+                "schema_version": "1.0",
+                "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                "job_id": job_id,
+                "case_name": str(briefing.get("case_name") or f"Case {job_id}"),
+                "timeline_scope": timeline_scope,
+                "included_files": included,
+                "excluded_files": excluded,
+                "notice": (
+                    "Validate conclusions against retained source evidence. Excluded "
+                    "source packages remain available as separate job outputs."
+                ),
+            }
+            archive.writestr(
+                "bundle_manifest.json",
+                json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+            )
+    finally:
+        csv_path.unlink(missing_ok=True)
+        workbook_path.unlink(missing_ok=True)
 
 
 def _briefing_case_name(job_id: str) -> str:

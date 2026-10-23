@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 from dataclasses import dataclass, field
 from hashlib import sha256
@@ -8,6 +9,24 @@ from pathlib import Path
 from typing import Any
 
 SQLITE_MAGIC = b"SQLite format 3\x00"
+
+ESXI_LOG_SOURCES = {
+    "auth": "esxi_auth_log",
+    "shell": "esxi_shell_log",
+    "hostd": "esxi_hostd_log",
+    "vpxa": "esxi_vpxa_log",
+    "vobd": "esxi_vobd_log",
+    "vmkernel": "esxi_vmkernel_log",
+    "vmkwarning": "esxi_vmkernel_log",
+    "fdm": "esxi_fdm_log",
+    "syslog": "esxi_syslog_log",
+    "esxupdate": "esxi_update_log",
+    "vmksummary": "esxi_summary_log",
+    "envoy-access": "esxi_proxy_log",
+    "rhttpproxy": "esxi_proxy_log",
+    "vmauthd": "esxi_auth_service_log",
+    "hostdcgiserver": "esxi_auth_service_log",
+}
 
 
 @dataclass
@@ -20,6 +39,7 @@ class SourceFile:
     parser_status: str = "discovered"
     event_count: int = 0
     parser_error: str = ""
+    parse_coverage: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -83,7 +103,11 @@ PATTERNS = {
     "shadow": ("etc/shadow",),
     "group": ("etc/group",),
     "sudoers": ("etc/sudoers", "etc/sudoers.d/*"),
-    "authorized_keys": ("home/*/.ssh/authorized_keys", "root/.ssh/authorized_keys"),
+    "authorized_keys": (
+        "home/*/.ssh/authorized_keys",
+        "root/.ssh/authorized_keys",
+        "etc/ssh/keys-*/authorized_keys",
+    ),
     "known_hosts": ("home/*/.ssh/known_hosts", "root/.ssh/known_hosts"),
     "sshd_config": ("etc/ssh/sshd_config", "etc/ssh/sshd_config.d/*"),
     "profile": (
@@ -128,16 +152,26 @@ def discover_sources(root: Path) -> list[SourceFile]:
         if not path.is_file() or path.is_symlink():
             continue
         rel = path.relative_to(root).as_posix()
-        if _ignored_artifact(rel) or not _is_sqlite_database(path):
+        if _ignored_artifact(rel):
             continue
-        sources.append(
-            SourceFile(
-                path=path,
-                relative=rel,
-                source_type="sqlite_log",
-                size=path.stat().st_size,
+        if esxi_source_type := _esxi_source_type(rel):
+            sources.append(
+                SourceFile(
+                    path=path,
+                    relative=rel,
+                    source_type=esxi_source_type,
+                    size=path.stat().st_size,
+                )
             )
-        )
+        if _is_sqlite_database(path):
+            sources.append(
+                SourceFile(
+                    path=path,
+                    relative=rel,
+                    source_type="sqlite_log",
+                    size=path.stat().st_size,
+                )
+            )
     seen: set[str] = set()
     unique: list[SourceFile] = []
     for source in sources:
@@ -272,6 +306,8 @@ def _ignored_artifact(relative: str) -> str:
 
 def _valid_source(source_type: str, relative: str) -> bool:
     name = Path(relative).name
+    if source_type in {"auth_log", "syslog", "web_log"} and _esxi_source_type(relative):
+        return False
     if source_type == "auth_log":
         return name.startswith("auth.log") or name.startswith("secure")
     if source_type == "cron":
@@ -293,3 +329,24 @@ def _valid_source(source_type: str, relative: str) -> bool:
     if source_type in {"shadow", "passwd", "group"}:
         return not name.endswith("-")
     return True
+
+
+def _esxi_source_type(relative: str) -> str:
+    """Return a dedicated source type for native ESXi vm-support logs."""
+    normalized = "/" + relative.lower().lstrip("/")
+    native_bundle = any(
+        re.match(r"esx-.+-\d{4}-\d{2}-\d{2}--", part) for part in Path(normalized).parts
+    )
+    if "/var/run/log/" not in normalized and not (
+        native_bundle and "/var/log/" in normalized
+    ):
+        return ""
+    name = Path(normalized).name
+    for suffix in (".gz", ".bz2", ".xz"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    for prefix, source_type in ESXI_LOG_SOURCES.items():
+        if re.fullmatch(rf"{re.escape(prefix)}(?:\.log(?:\.\d+)?|\.\d+)", name):
+            return source_type
+    return ""

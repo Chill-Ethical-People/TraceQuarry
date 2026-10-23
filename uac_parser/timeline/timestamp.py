@@ -24,6 +24,33 @@ MONTHS = {
     "Dec": 12,
 }
 
+EXPLICIT_ISO_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+    r"(?P<fraction>\.\d+)?(?:Z|[+-]\d{2}:?\d{2})(?P<period>\.)?$"
+)
+
+
+def _strip_iso_period(text: str) -> str:
+    match = EXPLICIT_ISO_RE.fullmatch(text)
+    return text[:-1] if match and match["period"] else text
+
+
+def format_utc_timestamp(value: str) -> str:
+    """Display explicitly zoned ISO timestamps without assigning zones to unknowns."""
+    text = value.strip()
+    match = EXPLICIT_ISO_RE.fullmatch(text)
+    if not match:
+        return text
+    try:
+        dt = datetime.fromisoformat(_strip_iso_period(text).replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    # Preserve fractional precision, but avoid padding normalized milliseconds to six digits.
+    fraction = match["fraction"] or ""
+    if len(fraction) > 4:
+        fraction = fraction[:4] + fraction[4:].rstrip("0")
+    return dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S") + fraction + " (UTC)"
+
 
 def to_utc_iso(dt: datetime) -> str:
     if dt.tzinfo is None:
@@ -42,7 +69,7 @@ def parse_epoch(value: str | int | float) -> str | None:
 
 
 def parse_iso(value: str) -> str | None:
-    text = value.strip()
+    text = _strip_iso_period(value.strip())
     if not text:
         return None
     try:

@@ -5,6 +5,22 @@ All notable TraceQuarry changes are documented here. The project follows
 
 ## [Unreleased]
 
+### Security
+
+- Removed exponential backtracking from authorized-key options parsing, with
+  quote-aware scanning and adversarial plain/compressed evidence tests.
+
+### Added
+
+- Native selective ESXi log parsing for individual vm-support archives and loose
+  logs, including SSH/SFTP, shell, management tasks, lifecycle and storage events.
+- Conservative VMkatz, VMFS payload and ransomware-tradecraft candidate tagging;
+  explicit profile assessments and supporting-row actor-similarity labels.
+- UTC fractional-second display, Summary/Raw adjacency and complete saved
+  selections in XLSX, plus a ZIP download of analysis deliverables.
+- Documented parsing limits, source coverage and attribution boundaries. Existing
+  cases must be reparsed to benefit from new detections.
+
 ## [0.4.0-beta.2] - 2026-07-26
 
 ### Added

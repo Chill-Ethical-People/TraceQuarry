@@ -124,8 +124,10 @@ class WebTests(unittest.TestCase):
         self.assertIn("focusAdjacentCaseOption", script)
         self.assertIn("Export Timeline CSV", page)
         self.assertIn("Export Investigation XLSX", page)
+        self.assertIn("Download All Results ZIP", page)
         self.assertIn('name="theme-color" content="#0E1626"', page)
         self.assertIn("investigation.xlsx", script)
+        self.assertIn("outputs.zip", script)
         self.assertIn("Cybersecurity incident executive briefing", script)
         self.assertIn("credential_harvesting", script)
         self.assertIn("copied `/var/log` tree", page)
@@ -674,6 +676,39 @@ class WebSecurityIntegrationTests(unittest.TestCase):
             self.assertIn("Selected Timeline", workbook_xml)
             self.assertIn("Timeline", workbook_xml)
             self.assertIn("Findings", workbook_xml)
+
+        (output / "summary.md").write_text("# Review export\n", encoding="utf-8")
+        (output / "findings.json").write_text("[]\n", encoding="utf-8")
+        (output / "caseweave_import_bundle.zip").write_bytes(b"nested archive")
+        (output / "caseweave_source_package.tar").write_bytes(b"source evidence")
+        host_output = output / "hosts" / "host-01"
+        host_output.mkdir(parents=True)
+        (host_output / "summary.md").write_text("# Host summary\n", encoding="utf-8")
+
+        bundle_status, bundle_headers, bundle_body = self.request(
+            "GET", f"/api/job/{job_id}/outputs.zip"
+        )
+        self.assertEqual(bundle_status, 200)
+        self.assertEqual(bundle_headers["Content-Type"], "application/zip")
+        self.assertEqual(
+            bundle_headers["Content-Disposition"],
+            'attachment; filename="tracequarry-results.zip"',
+        )
+        with zipfile.ZipFile(io.BytesIO(bundle_body)) as archive:
+            names = set(archive.namelist())
+            self.assertIn("tracequarry-timeline.csv", names)
+            self.assertIn("tracequarry-investigation.xlsx", names)
+            self.assertIn("artifacts/summary.md", names)
+            self.assertIn("artifacts/findings.json", names)
+            self.assertIn("artifacts/hosts/host-01/summary.md", names)
+            self.assertNotIn("artifacts/caseweave_import_bundle.zip", names)
+            self.assertNotIn("artifacts/caseweave_source_package.tar", names)
+            manifest = json.loads(archive.read("bundle_manifest.json"))
+            excluded = {item["path"] for item in manifest["excluded_files"]}
+            self.assertEqual(
+                excluded,
+                {"caseweave_import_bundle.zip", "caseweave_source_package.tar"},
+            )
 
     def test_staged_upload_session_accepts_150_files_and_reports_location(self) -> None:
         content = b"Jul 23 10:00:00 host sshd[1]: synthetic test record\n"
