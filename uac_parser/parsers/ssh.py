@@ -8,7 +8,7 @@ from uac_parser.timeline.event import TimelineEvent
 from .common import read_text_lines
 
 KEY_RE = re.compile(
-    r"^(?P<opts>(?:[^ ]+,)*[^ ]+\s+)?(?P<type>ssh-[a-z0-9-]+|ecdsa-[a-z0-9-]+|sk-[a-z0-9-]+)\s+(?P<key>\S+)(?:\s+(?P<comment>.*))?$"
+    r"^(?P<opts>\S+\s+)?(?P<type>ssh-[a-z0-9-]+|ecdsa-[a-z0-9-]+|sk-[a-z0-9-]+)\s+(?P<key>\S+)(?:\s+(?P<comment>.*))?$"
 )
 
 
