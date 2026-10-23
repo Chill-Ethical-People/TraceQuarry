@@ -138,6 +138,23 @@ def write_summary(
     all_context = context_events if context_events is not None else events
     lines = _summary_header(events, all_context, findings, storylines)
     lines.extend(_attack_phase_summary(events))
+    lines.extend(["", "## Payload and Profile Assessment"])
+    profiles = [
+        finding
+        for finding in findings
+        if finding.get("profile_id")
+        or "esxi_payload_candidate" in finding.get("tags", [])
+        or finding.get("profile_kind") == "actor_neutral_tradecraft"
+    ]
+    if not any(finding.get("profile_id") for finding in profiles):
+        lines.append(
+            "- No actor profile met its evidence thresholds. This does not rule out compromise; generic ESXi ransomware behavior and VMkatz use do not identify an operator."
+        )
+    for finding in profiles:
+        lines.append(f"- **{finding.get('title')}**: {finding.get('summary')}")
+    lines.append(
+        "- Payload labels are candidates; validate binaries/scripts, ransom notes and observed effects. Profile similarity is not attribution. See profile_assessment.json (case_profile_assessment.json for a case workspace)."
+    )
     lines.extend(
         _finding_section(
             "Lateral Movement Assessment",

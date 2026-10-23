@@ -12,7 +12,9 @@
 #
 # Status:
 #   Canonical runtime detection pack. TraceQuarry validates and loads tool_tags,
-#   ttp_tags, and actor_similarity_profiles. Complex correlations implemented in
+#   ttp_tags, actor_similarity_profiles, and explicit esxi_match payload selectors.
+#   Other malware_payload_tags entries are research-only, not runtime signatures.
+#   Complex correlations implemented in
 #   Python emit detection names that are mapped through this registry.
 
 metadata:
@@ -37,6 +39,36 @@ metadata:
     - "DFIR case reports and tool documentation"
 
 source_references:
+  vmkatz_esxi:
+    title: "VMkatz project: ESXi deployment and raw VMFS access"
+    url: "https://github.com/nikaiw/VMkatz/blob/main/docs/esxi.md"
+  sophos_python_esxi:
+    title: "Sophos: Python ransomware script targets ESXi server for encryption"
+    url: "https://www.sophos.com/en-us/blog/python-ransomware-script-targets-esxi-server-for-encryption"
+  incibe_esxiargs:
+    title: "INCIBE-CERT: ESXiArgs response and recovery actions"
+    url: "https://www.incibe.es/en/incibe-cert/blog/esxiargs-response-and-recovery-actions"
+  cisa_play_esxi:
+    title: "CISA AA23-352A: Play ransomware, including ESXi variant"
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-352a"
+  sentinelone_blacksuit_esxi:
+    title: "SentinelOne: BlackSuit ransomware analysis"
+    url: "https://www.sentinelone.com/anthology/blacksuit/"
+  crowdstrike_esxi_ransomware:
+    title: "CrowdStrike: Hypervisor Jackpotting, Part 1"
+    url: "https://www.crowdstrike.com/en-us/blog/carbon-spider-sprite-spider-target-esxi-servers-with-ransomware/"
+  huntress_esxi_hardening:
+    title: "Huntress: Hardening the Hypervisor"
+    url: "https://www.huntress.com/blog/hypervisor-defenses-against-ransomware-targeting-esxi"
+  mandiant_esxi_vibs:
+    title: "Mandiant: Investigating novel malware persistence within ESXi hypervisors"
+    url: "https://cloud.google.com/blog/topics/threat-intelligence/esxi-hypervisors-malware-persistence"
+  broadcom_esxi_logs:
+    title: "Broadcom: Location of ESXi log files"
+    url: "https://knowledge.broadcom.com/external/article?legacyId=2032076"
+  mitre_credential_dumping:
+    title: "MITRE ATT&CK: OS Credential Dumping"
+    url: "https://attack.mitre.org/techniques/T1003/"
   mitre_teamtnt:
     title: "MITRE ATT&CK G0139 TeamTNT"
     url: "https://attack.mitre.org/groups/G0139/"
@@ -172,6 +204,15 @@ tag_namespaces:
   timesketch: "Recommended label/search metadata for Timesketch export."
 
 tool_tags:
+  vmkatz:
+    namespace: tool
+    category: credential_access
+    confidence_when_matched: high
+    match_literals: ["vmkatz", "vmkatz_loader.py"]
+    required_detection_names: ["esxi_credential_dump_attempt"]
+    mitre: ["T1003"]
+    source_refs: ["vmkatz_esxi"]
+    analyst_note: "Recorded invocation, not proof of credential recovery or actor identity."
   rclone:
     namespace: tool
     category: exfiltration
@@ -563,6 +604,73 @@ tool_tags:
     timesketch_labels: ["tracequarry.web_service_transfer", "attack.T1105"]
 
 ttp_tags:
+  esxi_python_execution:
+    namespace: ttp
+    severity: low
+    confidence_when_matched: high
+    evidence: "Python script invocation recorded in ESXi shell logs; script success is not established."
+    mitre: ["T1059.006"]
+    match_detection_names: ["esxi_python_execution"]
+    source_refs: ["sophos_python_esxi"]
+  esxi_in_memory_loader_candidate:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "VMkatz Python loader invocation; in-memory loading capability, not proof it completed."
+    mitre: []
+    mitre_candidates: ["T1620", "T1562.001"]
+    match_detection_names: ["esxi_in_memory_loader_candidate"]
+    source_refs: ["vmkatz_esxi"]
+  esxi_raw_vmfs_credential_access:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "VMkatz invoked with raw VMFS device access; credential recovery remains unproven."
+    mitre: ["T1003"]
+    match_detection_names: ["esxi_raw_vmfs_credential_access"]
+    source_refs: ["vmkatz_esxi"]
+  esxi_vib_acceptance_lowered:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Command requests CommunitySupported acceptance; verify authorization and resulting state. Not evidence of UNC3886 by itself."
+    mitre: ["T1562.001"]
+    match_detection_names: ["esxi_vib_acceptance_lowered"]
+    source_refs: ["mandiant_esxi_vibs", "huntress_esxi_hardening"]
+  esxi_lockdown_disabled:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "Command requests lockdown disablement; may be authorized maintenance."
+    mitre: ["T1562.001"]
+    match_detection_names: ["esxi_lockdown_disabled"]
+    source_refs: ["huntress_esxi_hardening"]
+  esxi_vm_process_termination:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Recorded killall/pkill request targeting vmx; verify completion and maintenance context."
+    mitre: ["T1489"]
+    match_detection_names: ["esxi_vm_process_termination"]
+    source_refs: ["incibe_esxiargs", "crowdstrike_esxi_ransomware"]
+  esxi_snapshot_removal_requested:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Snapshot removal command; routine snapshot consolidation is common, recovery inhibition is only a candidate."
+    mitre: []
+    mitre_candidates: ["T1490"]
+    match_detection_names: ["esxi_snapshot_removal_requested"]
+    source_refs: ["huntress_esxi_hardening"]
+  esxi_vmfs_encryption_command:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: medium
+    evidence: "OpenSSL enc invocation with input/output and VMFS path; encryption intent is a candidate, not proof of ransomware or completed damage."
+    mitre: []
+    mitre_candidates: ["T1486"]
+    match_detection_names: ["esxi_vmfs_encryption_command"]
+    source_refs: ["sophos_python_esxi"]
   ssh_bruteforce:
     namespace: ttp
     severity: high
@@ -637,11 +745,12 @@ ttp_tags:
 
   exfil_tool_usage:
     namespace: ttp
-    severity: high
-    confidence_when_matched: high
-    evidence: "rclone, MEGAcmd, cloud CLI sync/copy, scp/rsync to external destination, or equivalent."
-    mitre: ["T1567", "T1567.002", "T1048", "T1105"]
-    timesketch_labels: ["ttp.exfil_tool", "attack.T1567"]
+    severity: medium
+    confidence_when_matched: low
+    evidence: "Transfer-capable tool invocation; direction, destination ownership, transfer completion and exfiltration intent require corroboration."
+    mitre: []
+    mitre_candidates: ["T1048", "T1105"]
+    timesketch_labels: ["ttp.exfil_tool"]
     match_detection_names: ["exfil_tool_usage"]
 
   cloud_storage_exfiltration:
@@ -651,7 +760,7 @@ ttp_tags:
     evidence: "Cloud storage command or remote name used to move data off-host."
     mitre: ["T1567.002"]
     timesketch_labels: ["ttp.cloud_storage_exfil", "attack.T1567.002"]
-    match_detection_names: ["exfil_tool_usage"]
+    match_detection_names: ["cloud_storage_exfiltration"]
     source_refs: ["mitre_exfil_cloud_storage", "mitre_rclone"]
 
   archive_creation_candidate:
@@ -899,11 +1008,84 @@ ttp_tags:
     namespace: ttp
     severity: high
     confidence_when_matched: medium
-    evidence: "esxcli/vim-cmd usage, VM datastore targeting, .vmdk/.vmx encryption/search, hypervisor service manipulation."
-    mitre: ["T1486", "T1569.003"]
+    evidence: "Destructive esxcli/vim-cmd operations, VM datastore targeting, or corroborated hypervisor impact activity."
+    # The parser supplies operation-specific techniques; unregister is not deletion.
+    mitre: []
     timesketch_labels: ["ttp.esxi_targeting", "tracequarry.virtualization"]
-    match_detection_names: ["esxi_or_vmware_admin_command"]
+    match_detection_names: ["esxi_destructive_vm_operation"]
     source_refs: ["mitre_akira"]
+
+  esxi_credential_dump_attempt:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "VMkatz executable or Python loader invocation. Invocation is not proof of credential recovery; target labels are not verified guest identities."
+    mitre: ["T1003"]
+    match_detection_names: ["esxi_credential_dump_attempt"]
+    source_refs: ["mitre_credential_dumping"]
+
+  esxi_datastore_script_execution:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: medium
+    evidence: "Interpreter invocation with a VMFS datastore target argument. Review the script and effects; its name alone does not establish encryption or malware family."
+    mitre: []
+    match_detection_names: ["esxi_datastore_script_execution"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_log_history_tampering:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Recorded truncation/removal of ESXi logs or shell history. Command completion and the amount of evidence lost require corroboration."
+    mitre: ["T1070"]
+    match_detection_names: ["esxi_log_history_tampering"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_logging_configuration_change:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: high
+    evidence: "esxcli/localcli system syslog set command. May be legitimate administration; the resulting logging state must be checked."
+    mitre: []
+    match_detection_names: ["esxi_logging_configuration_change"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_vib_validation_bypass:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "Software install/update/remove command with --no-sig-check or --force. Not proof that a malicious VIB was installed."
+    mitre: ["T1562.001"]
+    match_detection_names: ["esxi_vib_validation_bypass"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_filesystem_format_request:
+    namespace: ttp
+    severity: high
+    confidence_when_matched: high
+    evidence: "vmkfstools filesystem creation/format command. Potentially destructive administration; authorization and completion are not inferred."
+    mitre: ["T1561"]
+    match_detection_names: ["esxi_filesystem_format_request"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_inventory_discovery:
+    namespace: ttp
+    severity: low
+    confidence_when_matched: high
+    evidence: "Recorded VM, network or datastore inventory command. Also common in authorized administration."
+    mitre: ["T1082"]
+    match_detection_names: ["esxi_inventory_discovery"]
+    source_refs: ["broadcom_esxi_logs"]
+
+  esxi_account_management:
+    namespace: ttp
+    severity: medium
+    confidence_when_matched: high
+    evidence: "Account-management task or command. Inspect outcome and authorization; requested or failed changes must not be described as completed."
+    mitre: []
+    match_detection_names: ["esxi_account_management"]
+    source_refs: ["broadcom_esxi_logs"]
 
   ftp_sftp_exfiltration:
     namespace: ttp
@@ -1286,7 +1468,83 @@ actor_similarity_profiles:
     mitre_focus: ["T1552.005", "T1059.009", "T1567.002"]
     analyst_warning: "Actor-neutral cloud credential profile."
 
+esxi_behavior_profiles:
+  esxi_ransomware_tradecraft:
+    display_name: "ESXi ransomware tradecraft similarity (actor-neutral)"
+    window_hours: 24
+    minimum_event_count: 3
+    minimum_supporting_stages: 2
+    anchor_detections: ["esxi_payload_candidate", "esxi_vmfs_encryption_command"]
+    supporting_stages:
+      credential_access: ["esxi_credential_dump_attempt"]
+      persistence: ["esxi_ssh_key_modified"]
+      defense_impairment: ["esxi_exec_installed_only_disabled", "esxi_vib_validation_bypass", "esxi_vib_acceptance_lowered", "esxi_lockdown_disabled", "esxi_log_history_tampering"]
+      impact_preparation: ["esxi_destructive_vm_operation", "esxi_vm_process_termination", "esxi_snapshot_removal_requested"]
+    source_refs: ["sophos_python_esxi", "crowdstrike_esxi_ransomware", "huntress_esxi_hardening"]
+    analyst_warning: "Same-host temporal overlap, not proof of a shared operator, completed encryption, or ransomware family. Validate payload, effects and authorized maintenance."
+
 malware_payload_tags:
+  esxi_python_encryptor_candidate:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: low
+    match_literals: ["enc.py", "encrypt.py", "encryptor.py", "fcker.py"]
+    esxi_match:
+      executables: ["enc.py", "encrypt.py", "encryptor.py", "fcker.py"]
+      require_vmfs_target: true
+    mitre: []
+    mitre_candidates: ["T1486"]
+    source_refs: ["sophos_python_esxi"]
+    analyst_note: "enc.py/encrypt.py/encryptor.py are generic analyst filename heuristics, NOT published family IoCs. Sophos reported fcker.py. VMFS-targeted invocation merits payload recovery; no family or encryption success is inferred."
+  esxiargs_candidate:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: low
+    match_literals: ["encrypt", "encrypt.sh", "public.pem"]
+    esxi_match:
+      executables: ["encrypt", "encrypt.sh"]
+      require_vmfs_target: true
+      artifact_suffixes: [".vmdk.args", ".vmx.args", ".vmem.args"]
+    mitre: []
+    mitre_candidates: ["T1486"]
+    source_refs: ["incibe_esxiargs"]
+    analyst_note: "Generic names and argument sidecars are weak clues. Recover script/binary, key and ransom note; no CVE or operator is inferred."
+  play_esxi_candidate:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: low
+    match_literals: ["PLAY_Readme.txt", ".PLAY"]
+    esxi_match:
+      artifact_names: ["play_readme.txt"]
+      artifact_suffixes: [".vmdk.play", ".vmx.play", ".vmem.play"]
+    mitre: []
+    mitre_candidates: ["T1486"]
+    source_refs: ["cisa_play_esxi"]
+    analyst_note: "Explicit file observation only. Note contents and binary evidence are needed to validate family identity."
+  blacksuit_esxi_cli_candidate:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: low
+    match_literals: ["-killvm", "-percent"]
+    esxi_match:
+      required_arguments: ["-killvm", "-percent"]
+      require_vmfs_target: true
+    mitre: []
+    mitre_candidates: ["T1486"]
+    source_refs: ["sentinelone_blacksuit_esxi"]
+    analyst_note: "Option combination resembles reported BlackSuit/Royal CLI; names and options are reusable, not family attribution."
+  defray_esxi_filename_candidate:
+    namespace: malware_payload
+    category: ransomware
+    confidence_when_matched: low
+    match_literals: ["svc-new"]
+    esxi_match:
+      executables: ["svc-new"]
+      require_vmfs_target: true
+    mitre: []
+    mitre_candidates: ["T1486"]
+    source_refs: ["crowdstrike_esxi_ransomware"]
+    analyst_note: "Historical payload basename with VMFS target, not a unique signature or evidence of a specific operator."
   linux_encryptor_generic:
     namespace: malware_payload
     category: ransomware
@@ -1322,6 +1580,9 @@ malware_payload_tags:
     category: ransomware
     confidence_when_matched: medium
     match_literals: ["akira", "akira_readme.txt", "akira_readme", ".akira"]
+    esxi_match:
+      artifact_names: ["akira_readme.txt"]
+      artifact_suffixes: [".vmdk.akira", ".vmx.akira", ".vmem.akira"]
     behavior_hints:
       - "Linux/ESXi encryptor"
       - "virtual disk targeting"
@@ -1338,6 +1599,8 @@ malware_payload_tags:
     category: ransomware
     confidence_when_matched: medium
     match_literals: ["lockbit", "lockbit3", "lockbit_black", ".lockbit", "restore-my-files.txt"]
+    esxi_match:
+      artifact_suffixes: [".vmdk.lockbit", ".vmx.lockbit", ".vmem.lockbit"]
     behavior_hints:
       - "Linux/ESXi variants observed in ransomware operations"
       - "double extortion"
@@ -1368,13 +1631,16 @@ malware_payload_tags:
     category: ransomware
     confidence_when_matched: medium
     match_literals: ["blacksuit", "royal", "readme.black", ".royal", ".blacksuit"]
+    esxi_match:
+      artifact_names: ["readme.blacksuit.txt"]
+      artifact_suffixes: [".vmdk.blacksuit", ".vmx.blacksuit", ".vmdk.royal"]
     behavior_hints:
       - "Linux/ESXi variants reported for Royal/BlackSuit-style operations"
       - "intermittent or selective encryption may be observed"
     related_ttps: ["ttp.ransomware_or_destructive_impact", "ttp.esxi_or_virtualization_targeting"]
     mitre: ["T1486", "T1490"]
     timesketch_labels: ["malware.blacksuit_royal", "attack.T1486"]
-    source_refs: ["cisa_blacksuit", "mitre_ransomware"]
+    source_refs: ["cisa_blacksuit", "mitre_ransomware", "sentinelone_blacksuit_esxi"]
 
   babuk_esxi_linux_encryptor:
     namespace: malware_payload

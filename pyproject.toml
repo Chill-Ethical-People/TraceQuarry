@@ -1,7 +1,7 @@
 [project]
 name = "tracequarry"
 version = "0.4.0b2"
-description = "Local-first Linux DFIR timeline parser for UAC, native logs, SQLite evidence, ATT&CK enrichment, and case correlation."
+description = "Local-first Linux and ESXi DFIR timeline parser for UAC, native logs, SQLite evidence, ATT&CK enrichment, and case correlation."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 authors = [{name = "Kensho"}]
@@ -14,10 +14,12 @@ keywords = [
     "forensics",
     "incident-response",
     "linux",
+    "esxi",
     "mitre-attack",
     "sqlite",
     "timeline",
     "uac",
+    "vmware",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

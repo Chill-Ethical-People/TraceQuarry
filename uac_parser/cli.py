@@ -19,16 +19,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tracequarry",
         description=(
-            "Parse UAC collections, Linux logs, and supported SQLite evidence "
-            "into normalized forensic timelines with TTP enrichment."
+            "Parse UAC collections, Linux logs, individual ESXi vm-support "
+            "bundles, and supported SQLite evidence into normalized forensic "
+            "timelines with TTP enrichment."
         ),
     )
     parser.add_argument(
         "input",
         nargs="?",
         help=(
-            "UAC archive, extracted collection, copied Linux log directory, "
-            "loose/compressed log, or supported SQLite database"
+            "UAC archive, extracted collection, ESXi vm-support bundle, copied "
+            "Linux log directory, loose/compressed log, or supported SQLite database"
         ),
     )
     parser.add_argument("--out", help="Output directory for single-collection mode")
@@ -83,7 +84,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Timezone for syslog-style local timestamps, e.g. UTC or Asia/Hong_Kong",
     )
     parser.add_argument(
-        "--host", default="", help="Host override when UAC layout does not reveal it"
+        "--host",
+        default="",
+        help="Host override when evidence layout does not reveal it",
     )
     parser.add_argument(
         "--ioc",

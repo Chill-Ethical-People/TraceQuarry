@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from uac_parser.timeline.timestamp import (
+    format_utc_timestamp,
     parse_any,
     parse_apache,
     parse_epoch,
@@ -15,6 +16,22 @@ from uac_parser.timeline.timestamp import (
 
 
 class TimestampTests(unittest.TestCase):
+    def test_esxi_fractional_utc_display_and_terminal_period(self) -> None:
+        self.assertEqual(
+            parse_iso("2022-05-20T11:15:57.540Z."),
+            "2022-05-20T11:15:57.540000Z",
+        )
+        for value in (
+            "2022-05-20T11:15:57.540Z.",
+            "2022-05-20T11:15:57.540000Z",
+            "2022-05-20T19:15:57.540+08:00",
+        ):
+            self.assertEqual(
+                format_utc_timestamp(value), "2022-05-20 11:15:57.540 (UTC)"
+            )
+        naive = "2022-05-20T11:15:57.540"
+        self.assertEqual(format_utc_timestamp(naive), naive)
+
     def test_utc_normalization_handles_naive_and_offset_values(self) -> None:
         self.assertEqual(
             to_utc_iso(datetime(2026, 1, 2, 3, 4, 5)), "2026-01-02T03:04:05Z"

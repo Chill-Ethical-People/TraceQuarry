@@ -7,8 +7,35 @@ from typing import Any
 
 import xlsxwriter  # type: ignore[import-untyped]
 
+from uac_parser.timeline.timestamp import format_utc_timestamp
+
 EXCEL_MAX_ROWS = 1_048_576
 TIMELINE_ROWS_PER_SHEET = EXCEL_MAX_ROWS - 1
+
+REVIEW_COLUMN_ORDER = (
+    "timestamp",
+    "collection_host",
+    "host",
+    "summary",
+    "raw",
+    "attack_phases",
+    "mitre",
+    "analyst_tags",
+    "analyst_disposition",
+    "summary_selection",
+    "analyst_note",
+    "severity",
+    "confidence",
+    "attack_phase_candidates",
+    "mitre_candidates",
+    "detection_names",
+    "ttp_flags",
+    "tags",
+    "event_id",
+    "source_type",
+    "source_path",
+    "source_sha256",
+)
 
 # Keep exported workbooks visually consistent with the web workbench.
 BRAND_COLORS = {
@@ -38,6 +65,7 @@ def write_investigation_workbook(
     timeline_fields: Sequence[str],
     findings: Sequence[Mapping[str, Any]],
     filters: Mapping[str, str] | None = None,
+    selected_rows: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, int]:
     """Write a review workbook without interpreting evidence beyond the briefing."""
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -71,17 +99,30 @@ def write_investigation_workbook(
             briefing=briefing,
             filters=filters or {},
         )
-        _write_selected_timeline(workbook, formats, briefing)
+        if selected_rows is None:
+            _write_selected_timeline(workbook, formats, briefing)
+            selected_count = len(briefing.get("selected_events") or [])
+        else:
+            selected_count, _ = _write_timeline_sheets(
+                workbook,
+                formats,
+                selected_rows,
+                timeline_fields,
+                sheet_name="Selected Timeline",
+            )
         timeline_count, timeline_sheets = _write_timeline_sheets(
             workbook, formats, timeline_rows, timeline_fields
         )
         _write_findings(workbook, formats, findings)
+        _write_export_guide(
+            workbook, formats, briefing, filters or {}, timeline_count, selected_count
+        )
     finally:
         workbook.close()
     return {
         "timeline_rows": timeline_count,
         "timeline_sheets": timeline_sheets,
-        "selected_rows": len(briefing.get("selected_events") or []),
+        "selected_rows": selected_count,
         "findings": len(findings),
     }
 
@@ -445,8 +486,12 @@ def _write_selected_timeline(
         "timestamp_utc",
         "host",
         "attack_phases",
+        "mitre",
+        "attack_phase_candidates",
+        "mitre_candidates",
         "severity",
         "summary",
+        "raw_evidence",
         "analyst_disposition",
         "analyst_tags",
         "analyst_note",
@@ -454,16 +499,19 @@ def _write_selected_timeline(
         "source_type",
         "source_path",
         "source_sha256",
-        "raw_evidence",
     ]
     _write_header(worksheet, headers, formats["header"])
     for row_index, event in enumerate(briefing.get("selected_events") or [], start=1):
         values = [
-            event.get("timestamp"),
+            _display_timestamp(event.get("timestamp")),
             event.get("host"),
             ",".join(event.get("attack_phases") or []),
+            ",".join(event.get("mitre") or []),
+            ",".join(event.get("attack_phase_candidates") or []),
+            ",".join(event.get("mitre_candidates") or []),
             event.get("severity"),
             event.get("summary"),
+            event.get("raw"),
             event.get("analyst_disposition"),
             ",".join(event.get("analyst_tags") or []),
             event.get("analyst_note"),
@@ -471,14 +519,16 @@ def _write_selected_timeline(
             event.get("source_type"),
             event.get("source_path"),
             event.get("source_sha256"),
-            event.get("raw"),
         ]
         for column, value in enumerate(values):
             worksheet.write(
                 row_index,
                 column,
                 _cell(value),
-                formats["mono"] if column in {8, 10, 11, 12} else formats["body"],
+                formats["mono"]
+                if headers[column]
+                in {"event_id", "source_path", "source_sha256", "raw_evidence"}
+                else formats["body"],
             )
     worksheet.freeze_panes(1, 0)
     worksheet.autofilter(
@@ -492,23 +542,34 @@ def _write_timeline_sheets(
     formats: Mapping[str, Any],
     rows: Iterable[Mapping[str, Any]],
     fields: Sequence[str],
+    *,
+    sheet_name: str = "Timeline",
 ) -> tuple[int, int]:
+    fields = [key for key in REVIEW_COLUMN_ORDER if key in fields] + [
+        key for key in fields if key not in REVIEW_COLUMN_ORDER
+    ]
     worksheet = None
     sheet_count = 0
     row_count = 0
     row_in_sheet = 0
     for row in rows:
         if worksheet is None or row_in_sheet >= TIMELINE_ROWS_PER_SHEET:
+            if worksheet is not None:
+                worksheet.autofilter(0, 0, row_in_sheet, len(fields) - 1)
             sheet_count += 1
-            name = "Timeline" if sheet_count == 1 else f"Timeline {sheet_count}"
+            name = sheet_name if sheet_count == 1 else f"{sheet_name} {sheet_count}"
             worksheet = workbook.add_worksheet(name)
-            worksheet.set_tab_color(BRAND_COLORS["slate"])
+            worksheet.set_tab_color(
+                BRAND_COLORS["moss" if sheet_name == "Selected Timeline" else "slate"]
+            )
             _write_header(worksheet, fields, formats["header"])
-            worksheet.freeze_panes(1, 0)
+            worksheet.freeze_panes(1, 1)
             _set_timeline_widths(worksheet, fields)
             row_in_sheet = 0
         for column, field in enumerate(fields):
             value = row.get(field)
+            if field in {"timestamp", "time_start", "time_end"} and value:
+                value = format_utc_timestamp(str(value))
             worksheet.write(
                 row_in_sheet + 1,
                 column,
@@ -520,13 +581,77 @@ def _write_timeline_sheets(
         row_count += 1
         row_in_sheet += 1
     if worksheet is None:
-        worksheet = workbook.add_worksheet("Timeline")
+        worksheet = workbook.add_worksheet(sheet_name)
         worksheet.set_tab_color(BRAND_COLORS["slate"])
         _write_header(worksheet, fields, formats["header"])
-        worksheet.freeze_panes(1, 0)
+        worksheet.freeze_panes(1, 1)
         _set_timeline_widths(worksheet, fields)
         sheet_count = 1
+    worksheet.autofilter(0, 0, max(1, row_in_sheet), len(fields) - 1)
     return row_count, sheet_count
+
+
+def _write_export_guide(
+    workbook: Any,
+    formats: Mapping[str, Any],
+    briefing: Mapping[str, Any],
+    filters: Mapping[str, str],
+    timeline_count: int,
+    selected_count: int,
+) -> None:
+    worksheet = workbook.add_worksheet("Export Guide")
+    _write_header(worksheet, ["Item", "Meaning"], formats["header"])
+    details = [
+        (
+            "Timeline",
+            f"{timeline_count} normalized event rows in the exported scope. Case workspaces combine collections in UTC order; source and collection provenance remain in each row.",
+        ),
+        ("Scope", str(briefing.get("scope") or "full")),
+        (
+            "Timeline filters",
+            ", ".join(f"{key}={value}" for key, value in filters.items() if value)
+            or "None",
+        ),
+        (
+            "Selected Timeline",
+            f"{selected_count} saved summary selections in the scope, independent of Timeline search filters. Adding a tag alone does not select a summary milestone.",
+        ),
+        (
+            "Executive Briefing",
+            "Scope-wide metrics and a concise selection preview. Selected Timeline contains the exported selections beyond the 500-record GUI preview limit.",
+        ),
+        (
+            "attack_phases / mitre",
+            "Automatic ATT&CK tactic keys and technique IDs. These mappings require analyst validation and do not prove malicious intent.",
+        ),
+        (
+            "attack_phase_candidates / mitre_candidates",
+            "Tentative or ambiguous mappings retained separately from behavior-backed mappings.",
+        ),
+        (
+            "analyst_tags / analyst_note",
+            "Saved analyst annotations. Automatic mappings remain in their own columns. Unsaved edits are not exported.",
+        ),
+        (
+            "Blank mappings",
+            "No supported mapping was assigned to that record. Routine operational events may have no ATT&CK tags.",
+        ),
+        (
+            "Source evidence",
+            "Raw records, source hashes and event IDs support verification. Preserve original evidence and JSONL outputs; Excel cells are limited to 32,767 characters.",
+        ),
+        (
+            "Timestamp display",
+            "Explicitly zoned timeline timestamps are displayed in UTC with fractional seconds retained. Raw timestamps and evidence are unchanged; CSV/JSONL retain ISO 8601 timestamps.",
+        ),
+    ]
+    for index, (label, description) in enumerate(details, start=1):
+        worksheet.write(index, 0, label, formats["body"])
+        worksheet.write(index, 1, description, formats["body"])
+        worksheet.set_row(index, 55)
+    worksheet.set_column(0, 0, 38)
+    worksheet.set_column(1, 1, 115)
+    worksheet.freeze_panes(1, 0)
 
 
 def _write_findings(
@@ -567,8 +692,10 @@ def _write_header(worksheet: Any, fields: Sequence[str], cell_format: Any) -> No
 
 def _set_timeline_widths(worksheet: Any, fields: Sequence[str]) -> None:
     widths = {
-        "timestamp": 22,
-        "timestamp_utc": 22,
+        "timestamp": 36,
+        "timestamp_utc": 36,
+        "time_start": 36,
+        "time_end": 36,
         "summary": 52,
         "raw": 80,
         "raw_evidence": 80,
@@ -578,6 +705,9 @@ def _set_timeline_widths(worksheet: Any, fields: Sequence[str]) -> None:
         "event_id": 27,
         "attack_phases": 35,
         "attack_phase_candidates": 35,
+        "mitre": 25,
+        "mitre_candidates": 25,
+        "analyst_tags": 30,
         "extra": 55,
     }
     for column, field in enumerate(fields):
@@ -604,7 +734,7 @@ def _display_timestamp(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
         return "Untimed"
-    return text.replace("T", " ").replace("Z", " (UTC)")
+    return format_utc_timestamp(text)
 
 
 def _bullet(value: Any) -> str:

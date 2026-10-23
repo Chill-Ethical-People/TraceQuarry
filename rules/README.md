@@ -1,13 +1,15 @@
 # TraceQuarry Detection Pack
 
 `tagging_registry.yml` is TraceQuarry's canonical, contributor-maintained Linux
-detection pack. It contains four rule families:
+detection pack. It contains these rule families:
 
 - `tool_tags`: concrete tools, services, commands, and utilities.
 - `ttp_tags`: behavior tags and MITRE ATT&CK mappings.
 - `actor_similarity_profiles`: non-attributive combinations of observed tools
   and TTPs.
-- `malware_payload_tags`: cautiously worded Linux malware and payload metadata.
+- `malware_payload_tags`: research metadata, with opt-in `esxi_match` selectors
+  for low-confidence payload candidates.
+- `esxi_behavior_profiles`: bounded, same-host actor-neutral tradecraft profiles.
 
 `attack_phases.yml` is the companion technique-to-tactic registry. It is pinned
 to a named MITRE ATT&CK release and keeps confirmed `attack_phases` separate from
@@ -109,6 +111,32 @@ source events. `required_any_indicators` adds profile-specific anchors that
 prevent generic tradecraft from matching a named profile. Confidence is capped
 at `medium`; `high` is rejected by the validator. Profiles must preserve the
 phrase "This is not attribution" in generated findings.
+
+## Add An ESXi Payload Candidate
+
+An optional `esxi_match` under a malware rule activates conservative matching:
+
+```yaml
+esxi_match:
+  executables: ["example-encryptor"]
+  require_vmfs_target: true
+  required_arguments: ["--example-mode"]
+  artifact_names: ["example_note.txt"]
+  artifact_suffixes: [".vmdk.example"]
+```
+
+Use lowercase selector names (matching is case-insensitive for basenames), exact
+case-sensitive argument tokens and primary `source_refs`. Invocation requires
+all configured executable/argument/VMFS conditions. Explicit file observations
+use the separate artifact-name/suffix branch; they do not prove execution.
+`match_literals` alone does not activate payload detection. These rules always
+emit `payload_candidate.*` and candidate T1486, never the catalogue's actor or
+confirmed-malware labels. See [research and limits](../docs/ESXI_THREAT_RESEARCH.md).
+
+Tools can specify `required_detection_names` to require a structural parser
+signal before applying a literal label, as VMkatz does. The ESXi behavior profile
+has a configurable trailing window, minimum record count, independent supporting
+stages and a required candidate anchor. Do not move it into the actor namespace.
 
 ## Evidence And Review Requirements
 

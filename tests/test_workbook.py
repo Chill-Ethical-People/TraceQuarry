@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
@@ -7,6 +8,65 @@ from uac_parser.output.workbook import write_investigation_workbook
 
 
 class WorkbookTests(unittest.TestCase):
+    def test_review_columns_and_complete_selected_export(self) -> None:
+        event = {
+            "timestamp": "2022-05-20T11:15:57.540000Z",
+            "host": "lab",
+            "summary": "Script invocation recorded",
+            "raw": "2022-05-20T11:15:57.540Z. shell: python enc.py /vmfs/volumes/lab",
+            "mitre_candidates": ["T1486"],
+            "tags": ["payload_candidate.esxi_python_encryptor_candidate"],
+            "event_id": "evt-lab",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for streamed in (False, True):
+                with self.subTest(streamed=streamed):
+                    target = Path(directory) / "review.xlsx"
+                    result = write_investigation_workbook(
+                        target,
+                        case_name="Synthetic review",
+                        briefing={"selected_events": [event]},
+                        timeline_rows=[event],
+                        timeline_fields=list(event),
+                        findings=[],
+                        selected_rows=(
+                            dict(event, event_id=f"evt-{i}") for i in range(502)
+                        )
+                        if streamed
+                        else None,
+                    )
+                    self.assertEqual(result["selected_rows"], 502 if streamed else 1)
+                    with zipfile.ZipFile(target) as archive:
+                        namespace = {
+                            "s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                        }
+                        for sheet in (2, 3):
+                            root = ET.fromstring(
+                                archive.read(f"xl/worksheets/sheet{sheet}.xml")
+                            )
+                            rows = root.findall("s:sheetData/s:row", namespace)
+                            headers = [
+                                "".join(c.itertext())
+                                for c in rows[0].findall("s:c", namespace)
+                            ]
+                            values = {
+                                c.get("r"): "".join(c.itertext())
+                                for c in rows[1].findall("s:c", namespace)
+                            }
+                            raw_index = headers.index("summary") + 1
+                            self.assertIn(headers[raw_index], ("raw", "raw_evidence"))
+                            self.assertIn(event["raw"], values.values())
+                            self.assertIn(
+                                "2022-05-20 11:15:57.540 (UTC)", values.values()
+                            )
+                            self.assertIsNotNone(root.find("s:autoFilter", namespace))
+                            if sheet == 2:
+                                self.assertEqual(len(rows) - 1, result["selected_rows"])
+                        self.assertIn(
+                            b"payload_candidate.esxi_python_encryptor_candidate",
+                            archive.read("xl/worksheets/sheet3.xml"),
+                        )
+
     def test_workbook_contains_briefing_and_disables_formula_interpretation(
         self,
     ) -> None:

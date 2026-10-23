@@ -19,6 +19,7 @@
     const reviewBriefing = document.getElementById('review-briefing');
     const exploreTimeline = document.getElementById('explore-timeline');
     const exportWorkbook = document.getElementById('export-workbook');
+    const downloadResults = document.getElementById('download-results');
     const exportTimeline = document.getElementById('export-timeline');
     const downloadSummary = document.getElementById('download-summary');
     const previousCase = document.getElementById('previous-case');
@@ -793,6 +794,7 @@
       if (job.id) {
         const workbookUrl = investigationWorkbookUrl('full');
         exportWorkbook.href = workbookUrl;
+        downloadResults.href = `/api/job/${encodeURIComponent(job.id)}/outputs.zip`;
         summaryWorkbook.href = workbookUrl;
         briefingWorkbook.href = workbookUrl;
       }
@@ -1405,7 +1407,10 @@
     }
 
     function formatUtcTimestamps(value) {
-      return String(value).replace(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z/g, '$1-$2-$3 $4:$5:$6 (UTC)');
+      return String(value).replace(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d+)?Z\b/g, (_match, day, time, fraction = '') => {
+        const precision = fraction.length > 4 ? fraction.slice(0, 4) + fraction.slice(4).replace(/0+$/, '') : fraction;
+        return `${day} ${time}${precision} (UTC)`;
+      });
     }
 
     function attackPhaseLabel(value) {

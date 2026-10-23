@@ -10,7 +10,8 @@ an Internet-facing or multi-tenant incident-management service.
 - Single-user or trusted-team operation on Linux, macOS, Windows, or the
   hardened Docker Compose deployment.
 - UAC collections, copied Linux log trees, individual or compressed Linux logs,
-  and supported read-only SQLite forensic data.
+  individual ESXi `vm-support` bundles, and supported read-only SQLite forensic
+  data.
 - Single-collection and multi-collection case workspaces, UTC-normalized
   timelines, source coverage, IoC matching, ATT&CK context, findings, analyst
   annotations, summaries, and investigation exports.

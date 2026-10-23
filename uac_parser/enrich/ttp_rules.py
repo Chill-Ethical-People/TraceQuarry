@@ -5,12 +5,18 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Any
 
+from uac_parser.enrich.esxi_profiles import (
+    apply_payload_candidates,
+    esxi_profile_findings,
+)
 from uac_parser.enrich.rule_registry import (
     RegistryError,
     actor_similarity_rules,
+    malware_payload_rules,
     tool_rules,
     ttp_rules,
 )
+from uac_parser.parsers.esxi_activity import enrich_session_context
 from uac_parser.timeline.event import TimelineEvent
 
 TOOL_GROUPS = {
@@ -58,12 +64,15 @@ def _max_severity(a: str, b: str) -> str:
 
 
 def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
+    enrich_session_context(events)
     try:
         registry_tools = tool_rules()
         registry_ttps = ttp_rules()
+        registry_payloads = malware_payload_rules()
     except RegistryError:
         registry_tools = {}
         registry_ttps = {}
+        registry_payloads = {}
     for event in events:
         text = " ".join(
             filter(None, [event.command, event.file_path, event.summary, event.raw])
@@ -72,6 +81,13 @@ def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
             continue
         execution_text = _execution_text(event)
         indicator_search = _looks_like_indicator_search(event)
+        if (
+            indicator_search
+            or event.extra.get("read_only_inspection")
+            or event.extra.get("literal_arguments_only")
+        ):
+            execution_text = ""
+            indicator_search = True
         _apply_execution_rules(event, text, execution_text, indicator_search)
         _apply_collection_and_impact_rules(event, execution_text, indicator_search)
         _apply_access_and_network_rules(event, text, execution_text, indicator_search)
@@ -80,6 +96,7 @@ def enrich_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
             event, text, execution_text, indicator_search, registry_tools
         )
         _apply_registry_ttp_tags(event, registry_ttps)
+        apply_payload_candidates(event, registry_payloads)
     return events
 
 
@@ -186,13 +203,30 @@ def _apply_collection_and_impact_rules(
         r"\b(rm\s+-rf|shred|wipe|dd\s+if=)\b", execution_text
     ):
         _add(event, "destructive_command", "high", ["impact", "destructive"], ["T1485"])
-    if execution_text and re.search(r"\b(vim-cmd|esxcli)\b", execution_text):
+    esxi_destructive = (
+        re.search(
+            r"\b(?:vim-cmd\s+vmsvc/(?:power\.off|destroy|unregister|snapshot\.removeall)"
+            r"|esxcli\s+vm\s+process\s+kill)\b",
+            execution_text,
+        )
+        if execution_text
+        else None
+    )
+    if esxi_destructive and event.parser != "esxi":
+        operation = esxi_destructive.group(0)
+        mitre = (
+            ["T1489"]
+            if "power.off" in operation or "process kill" in operation
+            else ["T1490"]
+            if "snapshot.removeall" in operation
+            else ["T1485"]
+        )
         _add(
             event,
-            "esxi_or_vmware_admin_command",
+            "esxi_destructive_vm_operation",
             "high",
-            ["ransomware", "esxi"],
-            ["T1486"],
+            ["impact", "esxi", "destructive_vm_operation"],
+            mitre,
         )
     if (
         execution_text
@@ -305,7 +339,14 @@ def _apply_registry_tool_tags(
     indicator_search: bool,
     registry_tools: dict[str, dict[str, Any]],
 ) -> None:
+    if event.parser == "esxi" and not execution_text:
+        # Proxy headers, protocol names and task descriptions are not tool execution.
+        # Explicit file/process observations may still carry candidate tool mappings.
+        text = " ".join(filter(None, [event.file_path, event.process])).lower()
     for tool_id, rule in registry_tools.items():
+        required = set(rule.get("required_detection_names", []))
+        if required and not required.intersection(event.detection_names):
+            continue
         literals = [
             str(value).lower()
             for value in rule.get("match_literals", [])
@@ -332,13 +373,16 @@ def _apply_registry_tool_tags(
             f"tool_category.{category}",
             f"tool_confidence.{confidence}",
         ]
+        techniques = [str(value) for value in rule.get("mitre", [])]
         _add(
             event,
             action,
             severity,
             tags,
-            [str(value) for value in rule.get("mitre", [])],
+            techniques if executed else [],
         )
+        if not executed:
+            event.mitre_candidates = sorted(set(event.mitre_candidates + techniques))
 
 
 def _apply_registry_ttp_tags(
@@ -347,6 +391,10 @@ def _apply_registry_ttp_tags(
     detections = set(event.detection_names)
     tags = set(event.tags)
     for ttp_id, rule in registry_ttps.items():
+        if event.parser == "esxi" and ttp_id == "valid_account_remote_access":
+            # Native authentication observations already carry candidate mappings.
+            # A normal login alone is not adversarial valid-account use.
+            continue
         match_detections = set(rule.get("match_detection_names", []))
         match_actions = set(rule.get("match_event_actions", []))
         match_tags = set(rule.get("match_tags", []))
@@ -363,6 +411,9 @@ def _apply_registry_ttp_tags(
             str(rule.get("severity", "medium")),
             ["ttp", f"ttp.{ttp_id}", f"ttp_confidence.{confidence}"],
             [str(value) for value in rule.get("mitre", [])],
+        )
+        event.mitre_candidates = sorted(
+            set(event.mitre_candidates + list(rule.get("mitre_candidates", [])))
         )
 
 
@@ -528,7 +579,7 @@ def _looks_like_indicator_search(event: TimelineEvent) -> bool:
 
 def _tool_mitre(action: str) -> list[str]:
     return {
-        "exfil_tool_usage": ["T1567", "T1105"],
+        "exfil_tool_usage": [],
         "tunnel_or_proxy_tool": ["T1090"],
         "miner_execution": ["T1496"],
         "network_scanner": ["T1046"],
@@ -582,17 +633,56 @@ FINDING_POLICIES = frozenset(
         "auth_user_created",
         "auth_user_deleted",
         "auth_password_changed",
+        "esxi_ssh_key_modified",
+        "esxi_exec_installed_only_disabled",
+        "esxi_payload_transfer",
+        "esxi_remote_service_enabled",
+        "esxi_firewall_changed",
+        "esxi_software_change",
+        "esxi_host_isolated",
+        "esxi_storage_path_loss",
+        "esxi_vcenter_connectivity_lost",
+        "esxi_destructive_vm_operation",
+        "esxi_credential_dump_attempt",
+        "esxi_datastore_script_execution",
+        "esxi_log_history_tampering",
+        "esxi_logging_configuration_change",
+        "esxi_vib_validation_bypass",
+        "esxi_filesystem_format_request",
+        "esxi_account_management",
+        "esxi_account_lockout",
+        "esxi_datastore_operation",
+        "esxi_in_memory_loader_candidate",
+        "esxi_raw_vmfs_credential_access",
+        "esxi_vib_acceptance_lowered",
+        "esxi_lockdown_disabled",
+        "esxi_vm_process_termination",
+        "esxi_snapshot_removal_requested",
+        "esxi_vmfs_encryption_command",
     }
 )
 
 MEDIUM_FINDING_ACTIONS = frozenset(
     {
+        "esxi_datastore_script_execution",
+        "esxi_logging_configuration_change",
+        "esxi_account_management",
+        "esxi_account_lockout",
+        "esxi_datastore_operation",
         "suid_file_observed",
         "sgid_file_observed",
         "container_group_privilege_risk",
         "failed_login_history",
         "audit_authentication_failure",
         "audit_anomaly",
+        "esxi_payload_transfer",
+        "esxi_remote_service_enabled",
+        "esxi_firewall_changed",
+        "esxi_software_change",
+        "esxi_vcenter_connectivity_lost",
+        "esxi_destructive_vm_operation",
+        "esxi_vm_process_termination",
+        "esxi_snapshot_removal_requested",
     }
 )
 
@@ -691,6 +781,7 @@ def derive_findings(
     findings.extend(_lateral_movement_findings(events, available_source_types))
     findings.extend(_account_lifecycle_findings(events))
     findings.extend(_actor_like_findings(events))
+    findings.extend(esxi_profile_findings(events))
     return findings
 
 
@@ -761,7 +852,7 @@ def _lateral_movement_findings(
         ]
     available = available_source_types or {event.source_type for event in events}
     coverage_groups = {
-        "command history": {"shell_history"},
+        "command history": {"shell_history", "esxi_shell_log"},
         "network state": {"ss_output", "netstat_output", "network_state"},
         "SSH host history": {"known_hosts"},
     }
@@ -976,6 +1067,14 @@ def _actor_like_findings(events: list[TimelineEvent]) -> list[dict[str, Any]]:
                 "Activity overlaps with this profile. This is not attribution.",
             )
         )
+        for event in events:
+            if event.event_id in seen_event_ids:
+                event.tags = sorted(
+                    set(
+                        event.tags
+                        + [f"actor_similarity.{profile_id}", "not_attribution"]
+                    )
+                )
         findings.append(
             {
                 "title": str(profile.get("display_name", profile_id)),

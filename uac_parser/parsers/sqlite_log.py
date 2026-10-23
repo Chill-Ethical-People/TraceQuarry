@@ -5,7 +5,7 @@ import json
 import re
 import sqlite3
 from contextlib import suppress
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -84,6 +84,8 @@ def parse(
         tables = tables[:MAX_TABLES]
         lookups = _load_synology_lookups(database, tables)
         events: list[TimelineEvent] = []
+        if "Config" in tables:
+            events.extend(_esxi_account_metadata(database, relative, host))
         remaining = MAX_ROWS_PER_DATABASE
         for table in tables:
             if remaining <= 0:
@@ -138,6 +140,67 @@ def parse(
         return events
     finally:
         database.close()
+
+
+def _esxi_account_metadata(
+    database: sqlite3.Connection, relative: str, host: str
+) -> list[TimelineEvent]:
+    columns = {
+        str(row[1])
+        for row in database.execute("SELECT * FROM pragma_table_info('Config')")
+    }
+    required = {"Component", "ConfigGroup", "Name", "Identifier", "VitalValue"}
+    if not required.issubset(columns):
+        return []
+    events = []
+    rows = database.execute(
+        "SELECT Identifier, CASE WHEN length(VitalValue) <= 65536 "
+        "THEN VitalValue ELSE NULL END FROM Config WHERE Component=? "
+        "AND ConfigGroup=? AND Name=? LIMIT ?",
+        ("esx", "authentication", "user_accounts", MAX_ROWS_PER_TABLE),
+    )
+    for account, value in rows:
+        try:
+            obj = json.loads(value) if isinstance(value, (str, bytes)) else {}
+        except (ValueError, UnicodeDecodeError):
+            continue
+        days = obj.get("last_password_change") if isinstance(obj, dict) else None
+        if type(days) is not int or not 0 < days <= 2932896:
+            continue
+        changed = (date(1970, 1, 1) + timedelta(days=days)).isoformat()
+        # Do not export VitalValue: other keys may contain credential material.
+        record = {"Identifier": str(account), "last_password_change": days}
+        events.append(
+            TimelineEvent(
+                timestamp=changed + "T00:00:00Z",
+                timestamp_raw=str(days),
+                timestamp_precision="day",
+                timestamp_type="password_change_date_metadata",
+                timestamp_confidence="medium",
+                timezone_confidence="epoch_day_metadata",
+                evidence_role="state",
+                host=host,
+                user=str(account),
+                source_path=relative,
+                source_type="sqlite_log",
+                parser="sqlite_log",
+                event_category="account",
+                event_action="esxi_password_change_date_observed",
+                severity="informational",
+                confidence="high",
+                tags=["esxi", "configstore", "account_metadata", "date_only"],
+                summary=f"ESXi account {account}: stored password last-change date {changed} (date only; actor and method unknown)",
+                raw=json.dumps(record, sort_keys=True),
+                extra={
+                    "table": "Config",
+                    "record_identifier": str(account),
+                    "last_password_change_date": changed,
+                    "last_password_change_days": days,
+                    "evidence_limit": "Stored epoch-day value, not a password-change log. Midnight is a date sort anchor, not the time of a password operation; row modification time is not substituted.",
+                },
+            )
+        )
+    return events
 
 
 def _parse_table(
